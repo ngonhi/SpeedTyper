@@ -143,11 +143,10 @@ void end_game() {
  */
 void* draw_board(void* p) {
   int* r = p;
-  char* buffer[BUFFER_LEN];
-  FILE* stream = fopen("./input.txt", "r");
+
   // Need row, need word
   while(running) {
-    int line = rand() % LINE_NUM;
+    // int line = rand() % LINE_NUM;
     // read specific line and store in buffer
     
     // Loop over cells of the game board
@@ -168,6 +167,8 @@ void* draw_board(void* p) {
     
   // Sleep for a while before drawing the board again
   task_sleep(DRAW_BOARD_INTERVAL);
+
+  return NULL;
 }
 
 /**
@@ -197,6 +198,8 @@ void* read_input() {
       running = false;
     }
   }
+
+  return NULL;
 }
 
 /**
@@ -270,6 +273,8 @@ void* update_worm() {
       task_sleep(WORM_HORIZONTAL_INTERVAL);
     }
   }
+
+  return NULL;
 }
 
 void* run_game(void* p) {
@@ -287,12 +292,15 @@ void* run_game(void* p) {
       exit(2);
     }
   }
+
+  return NULL;
 }
 
 // Entry point: Set up the game, create jobs, then run the scheduler
 int main(void) {
   // load the dictionary
   read_library();
+  
   // Initialize the ncurses window
   WINDOW* mainwin = initscr();
   if(mainwin == NULL) {
