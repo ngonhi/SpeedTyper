@@ -11,6 +11,7 @@
 
 #include "scheduler.h"
 #include "util.h"
+#include "utility.h"
 
 // Defines used to track the worm direction
 #define DIR_NORTH 0
@@ -19,17 +20,14 @@
 #define DIR_WEST 3
 
 // Game parameters
-#define INIT_WORM_LENGTH 4
 #define WORM_HORIZONTAL_INTERVAL 200
-#define WORM_VERTICAL_INTERVAL 300
 #define DRAW_BOARD_INTERVAL 33
-#define APPLE_UPDATE_INTERVAL 120
+
 #define READ_INPUT_INTERVAL 150
-#define GENERATE_APPLE_INTERVAL 2000
+
 #define BOARD_WIDTH 50
-#define BOARD_HEIGHT 25
-#define BUFFER_LEN 20
-#define LINE_NUM 9897
+#define BOARD_HEIGHT 20 // Every two rows has one thread of words
+#define BUFFER_LEN 50
 
 /**
  * In-memory representation of the game board
@@ -37,26 +35,14 @@
  * Positive numbers represent worm cells (which count up at each time step until they reach worm_length)
  * Negative numbers represent apple cells (which count up at each time step)
  */
-int board[BOARD_HEIGHT][BOARD_WIDTH];
+char board[BOARD_HEIGHT][BOARD_WIDTH];
+int count = 0;
 
-char* library[LINE_NUM];
-
-void read_library() {
-  FILE* stream = fopen("./input.txt", "r");
-  for(int i = 0; i < LINE_NUM; i++) {
-    if(fgets(library[i], BUFFER_LEN, stream) == NULL) {
-      perror("fgets failed\n");
-      exit(2);
-    }
-  }
-}
 
 // Worm parameters
 int worm_dir = DIR_NORTH;
 int worm_length = INIT_WORM_LENGTH;
 
-// Apple parameters
-int apple_age = 120;
 
 // Is the game running?
 bool running = true;
@@ -82,6 +68,7 @@ int screen_row(int row) {
  * \return        A corresponding column number for the ncurses screen
  */
 int screen_col(int col) {
+  // Ori 2 + col
   return 2 + col;
 }
 
@@ -123,6 +110,8 @@ void init_display() {
  * Show a game over message and wait for a key press.
  */
 void end_game() {
+  // Print out the count for each player
+  // Create print score function
   mvprintw(screen_row(BOARD_HEIGHT/2)-1, screen_col(BOARD_WIDTH/2)-6, "            ");
   mvprintw(screen_row(BOARD_HEIGHT/2),   screen_col(BOARD_WIDTH/2)-6, " Game Over! ");
   mvprintw(screen_row(BOARD_HEIGHT/2)+1, screen_col(BOARD_WIDTH/2)-6, "            ");
@@ -160,7 +149,7 @@ void* draw_board(void* p) {
   }
   
   // Draw the score
-  mvprintw(screen_row(-2), screen_col(BOARD_WIDTH-9), "Score %03d\r", worm_length-INIT_WORM_LENGTH);
+  mvprintw(screen_row(-2), screen_col(BOARD_WIDTH-9), "Score 100\r"); // Get the count
   
   // Refresh the display
   refresh();
@@ -177,7 +166,9 @@ void* draw_board(void* p) {
 void* read_input() {
   while(running) {
     // Read a character, potentially blocking this thread until a key is pressed
-    int key = task_readchar();
+
+
+    /* int key = task_readchar();
     
     // Make sure the input was read correctly
     if(key == ERR) {
@@ -196,83 +187,82 @@ void* read_input() {
       worm_dir = DIR_WEST;
     } else if(key == 'q') {
       running = false;
-    }
+      } */
   }
 
   return NULL;
 }
 
+// Check if row is empty (no word)
+bool is_empty(int row) {
+  for (int col = 0; col < BOARD_WIDTH; col++) {
+    if (board[row][col] != ' ') {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void* del_word(void* p) {
+  int row = (int) *p;
+  char temp[BOARD_WIDTH];
+
+  // Init change to memcpy
+  for (int i=0; i < BOARD_WIDTH; i++) {
+    temp[i] = board[row][i];
+  }
+  
+  while(running) {
+    // Update one thread i.e. one row
+    board[row][0] = ' ';
+    for (int col=1; col < BOARD_WIDTH; col++) {
+      board[row][col] = temp[col - 1];
+    } // for col
+
+    for (int i=0; i < BOARD_WIDTH; i++) {
+      temp[i] = board[row][i];
+    }
+
+    // Check for edge collisions
+    if(board[row][BOARD_WIDTH - 1] == ' ') {
+      running = false;
+      end_game();
+    }
+
+  return NULL;
+}
+
+
 /**
  * Run in a thread to move the worm around on the board
  */
-void* update_worm() {
-  while(running) {
-    int worm_row;
-    int worm_col;
-  
-    // "Age" each existing segment of the worm
-    for(int r=0; r<BOARD_HEIGHT; r++) {
-      for(int c=0; c<BOARD_WIDTH; c++) {
-        if(board[r][c] == 1) {  // Found the head of the worm. Save position
-          worm_row = r;
-          worm_col = c;
-        }
-      
-        // Add 1 to the age of the worm segment
-        if(board[r][c] > 0) {
-          board[r][c]++;
-        
-          // Remove the worm segment if it is too old
-          if(board[r][c] > worm_length) {
-            board[r][c] = 0;
-          }
-        }
-      }
-    }
-  
-    // Move the worm into a new space
-    if(worm_dir == DIR_NORTH) {
-      worm_row--;
-    } else if(worm_dir == DIR_SOUTH) {
-      worm_row++;
-    } else if(worm_dir == DIR_EAST) {
-      worm_col++;
-    } else if(worm_dir == DIR_WEST) {
-      worm_col--;
-    }
-  
-    // Check for edge collisions
-    if(worm_row < 0 || worm_row >= BOARD_HEIGHT || worm_col < 0 || worm_col >= BOARD_WIDTH) {
-      running = false;
-      
-      // Add a key to the input buffer so the read_input thread can exit
-      ungetch(0);
-    }
-  
-    // Check for worm collisions
-    if(board[worm_row][worm_col] > 0) {
-      running = false;
-      
-      // Add a key to the input buffer so the read_input thread can exit
-      ungetch(0);
-    }
-  
-    // Check for apple collisions
-    if(board[worm_row][worm_col] < 0) {
-      // Worm gets longer
-      worm_length++;
-    }
-  
-    // Add the worm's new position
-    board[worm_row][worm_col] = 1;
-  
-    // Update the worm movement speed to deal with rectangular cursors
-    if(worm_dir == DIR_NORTH || worm_dir == DIR_SOUTH) {
-      task_sleep(WORM_VERTICAL_INTERVAL);
-    } else {
-      task_sleep(WORM_HORIZONTAL_INTERVAL);
-    }
+// NEED TO UPDATE SPEED
+void* move_word(void* p) {
+  int row = (int) *p;
+  char temp[BOARD_WIDTH];
+
+  // Init change to memcpy
+  for (int i=0; i < BOARD_WIDTH; i++) {
+    temp[i] = board[row][i];
   }
+  
+  while(running) {
+    // Update one thread i.e. one row
+    board[row][0] = ' ';
+    for (int col=1; col < BOARD_WIDTH; col++) {
+      board[row][col] = temp[col - 1];
+    } // for col
+
+    for (int i=0; i < BOARD_WIDTH; i++) {
+      temp[i] = board[row][i];
+    }
+
+    // Check for edge collisions
+    if(board[row][BOARD_WIDTH - 1] == ' ') {
+      running = false;
+      end_game();
+    }
 
   return NULL;
 }
@@ -298,8 +288,6 @@ void* run_game(void* p) {
 
 // Entry point: Set up the game, create jobs, then run the scheduler
 int main(void) {
-  // load the dictionary
-  read_library();
   
   // Initialize the ncurses window
   WINDOW* mainwin = initscr();
@@ -312,8 +300,8 @@ int main(void) {
   srand(time_ms());
   
   noecho();               // Don't print keys when pressed
-  keypad(mainwin, true);  // Support arrow keys
-  nodelay(mainwin, true); // Non-blocking keyboard access
+  //keypad(mainwin, true);  // Support arrow keys
+  //nodelay(mainwin, true); // Non-blocking keyboard access
   
   // Initialize the game display
   init_display();
@@ -347,3 +335,10 @@ int main(void) {
 
   return 0;
 }
+
+
+/* In main, we create 10 threads, each thread responsible for one row of words.
+ * Each thread will generate word if a line is empty, move and compare word simultaneously
+ * Struct to keep the state of each row, if empty, generate word, if not move and compare
+
+

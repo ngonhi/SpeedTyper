@@ -8,7 +8,7 @@
 
 char* on_screen[ROW_NUM];
 
-void generate_word(FILE* stream, char* word) {
+void generate_word(FILE* stream, int row) {
   
   // Seek to the end of the file so we can get its size
   if(fseek(stream, 0, SEEK_END) != 0) {
@@ -52,16 +52,25 @@ void generate_word(FILE* stream, char* word) {
   
   char ch = fgetc(stream);
   while(ch != '\n') {
-    word[j] = ch;
+    on_screen[row][j] = ch;
+    board[row][j] = ch;
     j++;
     ch = fgetc(stream);
   }
+}
 
-  word[j] = '\0';
+// helper for compare_word
+void match_letter(FILE* stream, int i, int* j, int* counter) {
+  char ch = getchar();
+  while(ch != '\n' && ch == on_screen[i][*j]) {
+    *j++;
+    *counter++;
+    ch = getchar();
+  }
 }
 
 
-void compare_word(char* input, int* count) {
+void compare_word(char* input, int* count, int* row) {
   while(1) {
     input[0] = getchar();
 
@@ -73,6 +82,9 @@ void compare_word(char* input, int* count) {
       }
     }
 
+    // Specify the row
+    *row = i;
+
     // lock
     int size = strlen(on_screen[i]); // does not include null terminator
   
@@ -80,26 +92,24 @@ void compare_word(char* input, int* count) {
     char ch = getchar();
     int j = 1;
     int counter = 0;
-    while (ch != '\n' && ch == on_screen[i][j]) {
-      j++;
-      counter++; // this might not work
-      ch = getchar();
+
+    // loop to check word until every char is matched
+    while (counter != size) {
+      match_letter(i, &j, &counter);
     }
+
+    // Delete word from the board
+    // block
+    for (int col = 0; col < BOARD_WIDTH; col++) {
+      board[i][col] = ' ';
+      on_screen[i][col] = ' ';
+    }
+
+    generate_word(stream, i);
+
     
-    if (counter == size) {
-      (*count)++;
-    }
-  }
-}
-
-
-int main(void) {
-  FILE* stream = fopen("input.txt", "r");
-
-  char word[WORD_LEN]
-
-
-
-  return 0;
+    // exit loop means completing match
+    *count++;
+  } // while(1)
 }
 
