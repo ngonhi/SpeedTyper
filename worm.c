@@ -29,7 +29,6 @@
  */
 char board[BOARD_HEIGHT][BOARD_WIDTH];
 
-pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
 FILE* stream;
 
 // Worm parameters
@@ -38,12 +37,8 @@ FILE* stream;
 
 
 // Is the game running?
-bool running = true;
+
 int counter = 0;
-typedef struct args_thread{
-  int row;
-  //char * words; // List of words 
-} args_thread_t;
 
 
 /**
@@ -149,16 +144,7 @@ void* draw_board(void* p) {
   return NULL;
 }
 
-// Check if row is empty (no word)
-bool is_empty(int row) {
-  for (int col = 0; col < BOARD_WIDTH; col++) {
-    if (board[row][col] != ' ') {
-      return false;
-    }
-  }
 
-  return true;
-}
 
 void* del_word(void* p) {
   int* row = (int*) p;
@@ -170,6 +156,7 @@ void* del_word(void* p) {
   }
   
   while(running) {
+    pthread_mutex_lock(&m);
     // Update one thread i.e. one row
     board[*row][0] = ' ';
     for (int col=1; col < BOARD_WIDTH; col++) {
@@ -184,6 +171,7 @@ void* del_word(void* p) {
     if(board[*row][BOARD_WIDTH - 1] == ' ') {
       running = false;
     }
+    pthread_mutex_unlock(&m);
   }
 
   return NULL;
@@ -235,24 +223,29 @@ void* run_game(void* p) {
   //generate_word(stream, row);
   //pthread_mutex_unlock(&m);
 
-  pthread_t threads[2];
-  args_thread_t args[2];
-  for(int i = 0; i < 2; i++) {
+  pthread_t threads[3];
+  args_thread_t args[3];
+  for(int i = 0; i < 3; i++) {
     args[i].row = row;
     //printf("%d ",args[i].row);
   }
+
+  if(pthread_create(&threads[0], NULL, generate_word, &args[0])) {
+    perror("pthread_creates failed\n");
+    exit(2);
+    }
   
-  if(pthread_create(&threads[0], NULL, draw_board, &args[0])) {
+  if(pthread_create(&threads[1], NULL, draw_board, &args[1])) {
       perror("pthread_creates failed\n");
       exit(2);
   }
 
-  if(pthread_create(&threads[1], NULL, move_word, &args[1])) {
+  if(pthread_create(&threads[2], NULL, move_word, &args[2])) {
       perror("pthread_creates failed\n");
       exit(2);
   }
 
-  for(int i = 0; i < 2; i++) {
+  for(int i = 1; i < 3; i++) {
     if(pthread_join(threads[i], NULL)) {
       perror("pthread_join main failed\n");
       exit(2);
@@ -264,7 +257,7 @@ void* run_game(void* p) {
 
 // Entry point: Set up the game, create jobs, then run the scheduler
 int main(void) {
-  
+  stream = fopen("input.txt", "r");
   //Initialize the ncurses window
   WINDOW* mainwin = initscr();
   if(mainwin == NULL) {
@@ -285,10 +278,10 @@ int main(void) {
   // Zero out the board contents
   memset(board, ' ', BOARD_WIDTH*BOARD_HEIGHT*sizeof(char));
 
-  for(int i = 0; i<BOARD_HEIGHT; i++) {
+  /*
+  for(int i =0; i < BOARD_HEIGHT; i++) {
     board[i][0] = 'a';
-  }
-
+    }*/
 /*
   for(int i = 0; i < BOARD_HEIGHT; i++) {
     for(int j = 0; j < BOARD_WIDTH; j++) {
@@ -333,6 +326,7 @@ int main(void) {
   delwin(mainwin);
   endwin();
 
+  fclose(stream);
   return 0;
 } // main
 

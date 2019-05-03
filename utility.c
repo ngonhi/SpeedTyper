@@ -1,60 +1,85 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <stdbool.h>
 #include "utility.h"
+
+bool running = true;
 
 char on_screen[ROW_NUM][WORD_LEN];
 char board[BOARD_HEIGHT][BOARD_WIDTH];
+FILE* stream;
+pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
 
-void generate_word(FILE* stream, int row) {
+// Check if row is empty (no word)
+bool is_empty(int row) {
+  for (int col = 0; col < BOARD_WIDTH; col++) {
+    if (board[row][col] != ' ') {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void* generate_word(void* p) {
+  args_thread_t*args = p;
+  int row = args->row;
   srand(time(NULL));
-  // Seek to the end of the file so we can get its size
-  if(fseek(stream, 0, SEEK_END) != 0) {
-    perror("Unable to seek to end of file");
-    exit(2);
-  }
+  while(running) {
+    if(is_empty(row)) {
+      // Seek to the end of the file so we can get its size
+      if(fseek(stream, 0, SEEK_END) != 0) {
+        perror("Unable to seek to end of file");
+        exit(2);
+      }
 
-  // Get the size of the file
-  size_t size = ftell(stream);
+      // Get the size of the file
+      size_t size = ftell(stream);
 
-  // Seek back to the beginning of the file
-  if(fseek(stream, 0, SEEK_SET) != 0) {
-    perror("Unable to seek to beginning of file");
-    exit(2);
-  }
+      // Seek back to the beginning of the file
+      if(fseek(stream, 0, SEEK_SET) != 0) {
+        perror("Unable to seek to beginning of file");
+        exit(2);
+      }
   
-  int offset = rand() % size;
-  while(offset > size-8) {
-    offset = rand() % size;
-  }
+      int offset = rand() % size;
+      while(offset > size-8) {
+        offset = rand() % size;
+      }
 
-  if(fseek(stream, offset, SEEK_SET) != 0) {
-    perror("Unable to seek to offset");
-    exit(2);
-  }
+      if(fseek(stream, offset, SEEK_SET) != 0) {
+        perror("Unable to seek to offset");
+        exit(2);
+      }
 
-  char c =fgetc(stream);
-  while(c != '\n') {
-    offset++;
-    c = fgetc(stream);
-  }
+      char c =fgetc(stream);
+      while(c != '\n') {
+        offset++;
+        c = fgetc(stream);
+      }
 
-  offset += 1; // Move to new word
+      offset += 1; // Move to new word
 
-  if(fseek(stream, offset, SEEK_SET) != 0) {
-    perror("Unable to seek to offset");
-    exit(2);
-  }
+      if(fseek(stream, offset, SEEK_SET) != 0) {
+        perror("Unable to seek to offset");
+        exit(2);
+      }
 
-  int j = 0;
+      int j = 0;
   
-  char ch = fgetc(stream);
-  while(ch != '\n') {
-    on_screen[row][j] = ch;
-    board[row][j] = ch;
-    j++;
-    ch = fgetc(stream);
-  }
+      char ch = fgetc(stream);
+      while(ch != '\n') {
+        pthread_mutex_lock(&m);
+        on_screen[row][j] = ch;
+        board[row][j] = ch;
+        j++;
+        ch = fgetc(stream);
+        pthread_mutex_unlock(&m);
+      }
+    }
+  } //while running
+  return NULL;
 }
 
 /* helper for compare_word
