@@ -6,7 +6,7 @@
 char on_screen[ROW_NUM][WORD_LEN];
 char board[BOARD_HEIGHT][BOARD_WIDTH];
 
-void generate_word(FILE* stream, int row) {
+void* generate_word(int row) {
   srand(time(NULL));
   // Seek to the end of the file so we can get its size
   if(fseek(stream, 0, SEEK_END) != 0) {

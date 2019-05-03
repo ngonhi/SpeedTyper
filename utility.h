@@ -10,6 +10,7 @@
 
 extern char on_screen[ROW_NUM][WORD_LEN];
 extern char board[BOARD_HEIGHT][BOARD_WIDTH];
+extern FILE* stream;
 
 void generate_word(FILE* stream, int row);
 

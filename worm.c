@@ -231,12 +231,12 @@ void* run_game(void* p) {
   args_thread_t* arg = p;
   int row = arg->row;
 
-  //pthread_mutex_lock(&m);
-  //generate_word(stream, row);
-  //pthread_mutex_unlock(&m);
+  pthread_mutex_lock(&m);
+  generate_word(stream, row);
+  pthread_mutex_unlock(&m);
 
-  pthread_t threads[2];
-  args_thread_t args[2];
+  pthread_t threads[3];
+  args_thread_t args[3];
   for(int i = 0; i < 2; i++) {
     args[i].row = row;
     //printf("%d ",args[i].row);
@@ -252,7 +252,12 @@ void* run_game(void* p) {
       exit(2);
   }
 
-  for(int i = 0; i < 2; i++) {
+  if(pthread_create(&threads[2], NULL, generate_word, &args[2])) {
+      perror("pthread_creates failed\n");
+      exit(2);
+  }
+
+  for(int i = 0; i < 3; i++) {
     if(pthread_join(threads[i], NULL)) {
       perror("pthread_join main failed\n");
       exit(2);
@@ -284,6 +289,7 @@ int main(void) {
   
   // Zero out the board contents
   memset(board, ' ', BOARD_WIDTH*BOARD_HEIGHT*sizeof(char));
+
 
   for(int i = 0; i<BOARD_HEIGHT; i++) {
     board[i][0] = 'a';
