@@ -25,6 +25,7 @@ bool is_empty(int row) {
 void* generate_word(void* p) {
   args_thread_t*args = p;
   int row = args->row;
+
   srand(time(NULL));
   while(running) {
     if(is_empty(row)) {

@@ -18,6 +18,7 @@
 extern char on_screen[ROW_NUM][WORD_LEN];
 extern char board[BOARD_HEIGHT][BOARD_WIDTH];
 extern FILE* stream;
+
 extern bool running;
 extern pthread_mutex_t m;
 
