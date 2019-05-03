@@ -13,7 +13,7 @@
 #include "utility.h"
 
 // Game parameters
-#define WORM_HORIZONTAL_INTERVAL 500 // This will be word speed
+#define WORM_HORIZONTAL_INTERVAL 50 // This will be word speed
 #define DRAW_BOARD_INTERVAL 30
 
 #define READ_INPUT_INTERVAL 150
@@ -135,48 +135,14 @@ void* draw_board(void* p) {
   
   // Refresh the display
   refresh();
-    
+
+  pthread_mutex_unlock(&m);
   // Sleep for a while before drawing the board again
   sleep_ms(DRAW_BOARD_INTERVAL);
-  pthread_mutex_unlock(&m);
   }
   
   return NULL;
 }
-
-
-
-void* del_word(void* p) {
-  int* row = (int*) p;
-  char temp[BOARD_WIDTH];
-
-  // Init change to memcpy
-  for (int i=0; i < BOARD_WIDTH; i++) {
-    temp[i] = board[*row][i];
-  }
-  
-  while(running) {
-    pthread_mutex_lock(&m);
-    // Update one thread i.e. one row
-    board[*row][0] = ' ';
-    for (int col=1; col < BOARD_WIDTH; col++) {
-      board[*row][col] = temp[col - 1];
-    } // for col
-
-    for (int i=0; i < BOARD_WIDTH; i++) {
-      temp[i] = board[*row][i];
-    }
-
-    // Check for edge collisions
-    if(board[*row][BOARD_WIDTH - 1] == ' ') {
-      running = false;
-    }
-    pthread_mutex_unlock(&m);
-  }
-
-  return NULL;
-}
-
 
 /**
  * Run in a thread to move the worm around on the board
@@ -188,11 +154,14 @@ void* move_word(void* p) {
   char temp[BOARD_WIDTH];
 
   // Init change to memcpy
+  pthread_mutex_lock(&m);
   for (int i=0; i < BOARD_WIDTH; i++) {
     temp[i] = board[row][i];
   }
+  pthread_mutex_unlock(&m);
   
   while(running) {
+    pthread_mutex_lock(&m);
     // Update one thread i.e. one row
     board[row][0] = ' ';
     for (int col=1; col < BOARD_WIDTH; col++) {
@@ -209,7 +178,8 @@ void* move_word(void* p) {
       //end_game();
     }
 
-    sleep_ms(WORM_HORIZONTAL_INTERVAL);
+    pthread_mutex_unlock(&m);
+    sleep_ms(WORM_HORIZONTAL_INTERVAL);   
   } // while
 
   return NULL;
@@ -219,9 +189,9 @@ void* run_game(void* p) {
   args_thread_t* arg = p;
   int row = arg->row;
 
-  pthread_mutex_lock(&m);
-  generate_word(stream, row);
-  pthread_mutex_unlock(&m);
+  //pthread_mutex_lock(&m);
+  //generate_word(stream, row);
+  //pthread_mutex_unlock(&m);
 
   pthread_t threads[3];
   args_thread_t args[3];
@@ -252,6 +222,7 @@ void* run_game(void* p) {
       exit(2);
     }
   }
+
   return NULL;
 }
 

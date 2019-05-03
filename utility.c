@@ -26,8 +26,8 @@ void* generate_word(void* p) {
   args_thread_t*args = p;
   int row = args->row;
 
-  srand(time(NULL));
   while(running) {
+    pthread_mutex_lock(&m);
     if(is_empty(row)) {
       // Seek to the end of the file so we can get its size
       if(fseek(stream, 0, SEEK_END) != 0) {
@@ -71,14 +71,15 @@ void* generate_word(void* p) {
   
       char ch = fgetc(stream);
       while(ch != '\n') {
-        pthread_mutex_lock(&m);
+        
         on_screen[row][j] = ch;
         board[row][j] = ch;
         j++;
         ch = fgetc(stream);
-        pthread_mutex_unlock(&m);
+        
       }
     }
+    pthread_mutex_unlock(&m);
   } //while running
   return NULL;
 }
