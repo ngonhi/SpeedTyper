@@ -1,15 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <utility.h>
+#include "utility.h"
 
-#define WORD_LEN 50
-#define ROW_NUM 10
-
-char* on_screen[ROW_NUM];
+char on_screen[ROW_NUM][WORD_LEN];
+char board[BOARD_HEIGHT][BOARD_WIDTH];
 
 void generate_word(FILE* stream, int row) {
-  
+  srand(time(NULL));
   // Seek to the end of the file so we can get its size
   if(fseek(stream, 0, SEEK_END) != 0) {
     perror("Unable to seek to end of file");
@@ -59,7 +57,7 @@ void generate_word(FILE* stream, int row) {
   }
 }
 
-// helper for compare_word
+/* helper for compare_word
 void match_letter(FILE* stream, int i, int* j, int* counter) {
   char ch = getchar();
   while(ch != '\n' && ch == on_screen[i][*j]) {
@@ -70,7 +68,7 @@ void match_letter(FILE* stream, int i, int* j, int* counter) {
 }
 
 
-void compare_word(char* input, int* count, int* row) {
+void compare_word(FILE* stream, char* input, int* count, int* row) {
   while(1) {
     input[0] = getchar();
 
@@ -112,4 +110,16 @@ void compare_word(char* input, int* count, int* row) {
     *count++;
   } // while(1)
 }
-
+*/
+/*
+int main() {
+  FILE* stream;
+  stream = fopen("small_input.txt", "r");
+  generate_word(stream, 5);
+  for(int i = 0; i < BOARD_HEIGHT; i++) {
+    for(int j = 0; j < BOARD_WIDTH; j++) {
+      printf("%c ", board[i][j]);
+    }
+    printf("\n");
+  }
+}*/

@@ -9,24 +9,16 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#include "scheduler.h"
 #include "util.h"
 #include "utility.h"
 
-// Defines used to track the worm direction
-#define DIR_NORTH 0
-#define DIR_EAST 1
-#define DIR_SOUTH 2
-#define DIR_WEST 3
-
 // Game parameters
-#define WORM_HORIZONTAL_INTERVAL 200
-#define DRAW_BOARD_INTERVAL 33
+#define WORM_HORIZONTAL_INTERVAL 500 // This will be word speed
+#define DRAW_BOARD_INTERVAL 30
 
 #define READ_INPUT_INTERVAL 150
 
-#define BOARD_WIDTH 50
-#define BOARD_HEIGHT 20 // Every two rows has one thread of words
+
 #define BUFFER_LEN 50
 
 /**
@@ -36,17 +28,18 @@
  * Negative numbers represent apple cells (which count up at each time step)
  */
 char board[BOARD_HEIGHT][BOARD_WIDTH];
-int count = 0;
 
+pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+FILE* stream;
 
 // Worm parameters
-int worm_dir = DIR_NORTH;
-int worm_length = INIT_WORM_LENGTH;
+//int worm_dir = DIR_NORTH;
+//int worm_length = INIT_WORM_LENGTH;
 
 
 // Is the game running?
 bool running = true;
-
+int counter = 0;
 typedef struct args_thread{
   int row;
   //char * words; // List of words 
@@ -77,7 +70,7 @@ int screen_col(int col) {
  */
 void init_display() {
   // Print Title Line
-  move(screen_row(-2), screen_col(BOARD_WIDTH/2 - 12));
+  move(screen_row(-2), screen_col(BOARD_WIDTH/2 - 9));
   addch(ACS_DIAMOND);
   addch(ACS_DIAMOND);
   printw(" SPEED TYPER! ");
@@ -118,7 +111,6 @@ void end_game() {
   mvprintw(screen_row(BOARD_HEIGHT/2)+2, screen_col(BOARD_WIDTH/2)-11, "Press any key to exit.");
   refresh();
   timeout(-1);
-  task_readchar();
 }
 
 
@@ -131,22 +123,17 @@ void end_game() {
  * Run in a thread to draw the current state of the game board.
  */
 void* draw_board(void* p) {
-  int* r = p;
-
+  args_thread_t* arg = p;
+  int r = arg->row;
   // Need row, need word
   while(running) {
-    // int line = rand() % LINE_NUM;
-    // read specific line and store in buffer
-    
+    pthread_mutex_lock(&m);
     // Loop over cells of the game board
-    for(int c=0; c<BOARD_WIDTH; c++) {
-      if(board[*r][c] == 0) {  // Draw blank spaces
-        mvaddch(screen_row(*r), screen_col(c), ' ');
-      } else if (board[*r][c] > 0) {  // Draw worm
-        mvaddch(screen_row(*r), screen_col(c), 'O');
+    //for (int r=0; r<BOARD_HEIGHT; r++) {
+      for(int c=0; c<BOARD_WIDTH; c++) {
+        mvaddch(screen_row(r), screen_col(c), board[r][c]);
       }
-    }
-  }
+    //}
   
   // Draw the score
   mvprintw(screen_row(-2), screen_col(BOARD_WIDTH-9), "Score 100\r"); // Get the count
@@ -155,41 +142,10 @@ void* draw_board(void* p) {
   refresh();
     
   // Sleep for a while before drawing the board again
-  task_sleep(DRAW_BOARD_INTERVAL);
-
-  return NULL;
-}
-
-/**
- * Run in a thread to process user input.
- */
-void* read_input() {
-  while(running) {
-    // Read a character, potentially blocking this thread until a key is pressed
-
-
-    /* int key = task_readchar();
-    
-    // Make sure the input was read correctly
-    if(key == ERR) {
-      running = false;
-      fprintf(stderr, "ERROR READING INPUT\n");
-    }
-    
-    // Handle the key press
-    if(key == KEY_UP && worm_dir != DIR_SOUTH) {
-      worm_dir = DIR_NORTH;
-    } else if(key == KEY_RIGHT && worm_dir != DIR_WEST) {
-      worm_dir = DIR_EAST;
-    } else if(key == KEY_DOWN && worm_dir != DIR_NORTH) {
-      worm_dir = DIR_SOUTH;
-    } else if(key == KEY_LEFT && worm_dir != DIR_EAST) {
-      worm_dir = DIR_WEST;
-    } else if(key == 'q') {
-      running = false;
-      } */
+  sleep_ms(DRAW_BOARD_INTERVAL);
+  pthread_mutex_unlock(&m);
   }
-
+  
   return NULL;
 }
 
@@ -205,30 +161,30 @@ bool is_empty(int row) {
 }
 
 void* del_word(void* p) {
-  int row = (int) *p;
+  int* row = (int*) p;
   char temp[BOARD_WIDTH];
 
   // Init change to memcpy
   for (int i=0; i < BOARD_WIDTH; i++) {
-    temp[i] = board[row][i];
+    temp[i] = board[*row][i];
   }
   
   while(running) {
     // Update one thread i.e. one row
-    board[row][0] = ' ';
+    board[*row][0] = ' ';
     for (int col=1; col < BOARD_WIDTH; col++) {
-      board[row][col] = temp[col - 1];
+      board[*row][col] = temp[col - 1];
     } // for col
 
     for (int i=0; i < BOARD_WIDTH; i++) {
-      temp[i] = board[row][i];
+      temp[i] = board[*row][i];
     }
 
     // Check for edge collisions
-    if(board[row][BOARD_WIDTH - 1] == ' ') {
+    if(board[*row][BOARD_WIDTH - 1] == ' ') {
       running = false;
-      end_game();
     }
+  }
 
   return NULL;
 }
@@ -239,7 +195,8 @@ void* del_word(void* p) {
  */
 // NEED TO UPDATE SPEED
 void* move_word(void* p) {
-  int row = (int) *p;
+  args_thread_t* arg = p;
+  int row = arg->row;
   char temp[BOARD_WIDTH];
 
   // Init change to memcpy
@@ -259,37 +216,56 @@ void* move_word(void* p) {
     }
 
     // Check for edge collisions
-    if(board[row][BOARD_WIDTH - 1] == ' ') {
+    if(board[row][BOARD_WIDTH - 1] != ' ') {
       running = false;
-      end_game();
+      //end_game();
     }
+
+    sleep_ms(WORM_HORIZONTAL_INTERVAL);
+  } // while
 
   return NULL;
 }
 
 void* run_game(void* p) {
-  args_thread_t* args = p;
-  int row = args->row;
+  args_thread_t* arg = p;
+  int row = arg->row;
 
-  pthread_t threads[3];
-  pthread_create(&threads[0], NULL, update_worm, NULL);
-  pthread_create(&threads[1], NULL, draw_board, &row);
-  pthread_create(&threads[2], NULL, read_input, NULL);
+  //pthread_mutex_lock(&m);
+  //generate_word(stream, row);
+  //pthread_mutex_unlock(&m);
 
-  for(int i = 0; i < 3; i++) {
+  pthread_t threads[2];
+  args_thread_t args[2];
+  for(int i = 0; i < 2; i++) {
+    args[i].row = row;
+    //printf("%d ",args[i].row);
+  }
+  
+  if(pthread_create(&threads[0], NULL, draw_board, &args[0])) {
+      perror("pthread_creates failed\n");
+      exit(2);
+  }
+
+  if(pthread_create(&threads[1], NULL, move_word, &args[1])) {
+      perror("pthread_creates failed\n");
+      exit(2);
+  }
+
+  for(int i = 0; i < 2; i++) {
     if(pthread_join(threads[i], NULL)) {
-      perror("pthread_join failed\n");
+      perror("pthread_join main failed\n");
       exit(2);
     }
   }
-
   return NULL;
 }
+
 
 // Entry point: Set up the game, create jobs, then run the scheduler
 int main(void) {
   
-  // Initialize the ncurses window
+  //Initialize the ncurses window
   WINDOW* mainwin = initscr();
   if(mainwin == NULL) {
     fprintf(stderr, "Error initializing ncurses.\n");
@@ -302,30 +278,54 @@ int main(void) {
   noecho();               // Don't print keys when pressed
   //keypad(mainwin, true);  // Support arrow keys
   //nodelay(mainwin, true); // Non-blocking keyboard access
-  
+  stream = fopen("./small_input.txt", "r");
   // Initialize the game display
   init_display();
   
   // Zero out the board contents
-  memset(board, 0, BOARD_WIDTH*BOARD_HEIGHT*sizeof(int));
+  memset(board, ' ', BOARD_WIDTH*BOARD_HEIGHT*sizeof(char));
 
-  // Put the worm at the right border of the board
-  board[0][BOARD_WIDTH-1] = 1;
-  
-  pthread_t threads[BOARD_HEIGHT];
-  args_thread_t args[BOARD_HEIGHT];
+  for(int i = 0; i<BOARD_HEIGHT; i++) {
+    board[i][0] = 'a';
+  }
+
+/*
   for(int i = 0; i < BOARD_HEIGHT; i++) {
-    args[i].row = rand() % BOARD_HEIGHT;
+    for(int j = 0; j < BOARD_WIDTH; j++) {
+      printf("%c ", board[i][j]);
+      //mvaddch(screen_row(i), screen_col(j), board[i][j]);
+    }
+    printf("\n");
+  }
+*/
+/*
+  args_thread_t args[10];
+  for(int i = 0; i < 10; i++) {
+    args[i].row = i*2+3;
+    printf("%d ",args[i].row);
+  }
+*/
+  
+  pthread_t threads[10];
+  args_thread_t args[10];
+  for(int i = 0; i < 10; i++) {
+    args[i].row = i*2;
     if(pthread_create(&threads[i], NULL, run_game, &args[i])) {
       perror("pthread_creates failed\n");
       exit(2);
     }
   }
   
-  // Don't wait for the generate_apple task because it sleeps for 2 seconds,
-  // which creates a noticeable delay when exiting.
-  //task_wait(generate_apple_thread);
-  
+  for(int i = 0; i < 10; i++) {
+    if(pthread_join(threads[i], NULL)) {
+      perror("pthread_join main failed\n");
+      exit(2);
+    }
+  }
+
+
+  //run_game(counter+2);
+
   // Display the end of game message and wait for user input
   end_game();
   
@@ -334,11 +334,11 @@ int main(void) {
   endwin();
 
   return 0;
-}
+} // main
 
 
 /* In main, we create 10 threads, each thread responsible for one row of words.
  * Each thread will generate word if a line is empty, move and compare word simultaneously
  * Struct to keep the state of each row, if empty, generate word, if not move and compare
-
+*/
 
