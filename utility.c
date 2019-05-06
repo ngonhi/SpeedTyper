@@ -8,8 +8,12 @@ bool running = true;
 
 char on_screen[ROW_NUM][WORD_LEN];
 char board[BOARD_HEIGHT][BOARD_WIDTH];
+char input[WORD_LEN];
+int *count;
 FILE* stream;
+
 pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t m2 = PTHREAD_MUTEX_INITIALIZER;
 
 // Check if row is empty (no word)
 bool is_empty(int row) {
@@ -22,11 +26,26 @@ bool is_empty(int row) {
   return true;
 }
 
+
+// Write a helper function check if running is true or false
+// lock check unlock return
+bool check_running() {
+  pthread_mutex_lock(&m);
+  if (running) {
+    pthread_mutex_unlock(&m);
+    return true;
+  } else {
+    pthread_mutex_unlock(&m);
+    return false;
+  }
+}
+
+
 void* generate_word(void* p) {
   args_thread_t*args = p;
   int row = args->row;
 
-  while(running) {
+  while(check_running()) {
     pthread_mutex_lock(&m);
     if(is_empty(row)) {
       // Seek to the end of the file so we can get its size
@@ -84,7 +103,8 @@ void* generate_word(void* p) {
   return NULL;
 }
 
-/* helper for compare_word
+// helper for compare_word
+/*
 void match_letter(FILE* stream, int i, int* j, int* counter) {
   char ch = getchar();
   while(ch != '\n' && ch == on_screen[i][*j]) {
@@ -93,60 +113,56 @@ void match_letter(FILE* stream, int i, int* j, int* counter) {
     ch = getchar();
   }
 }
+*/
 
+// helper to read user input
+void read_input() {
+  char ch = getch();
+  mvaddch(50, 50, ch);
+  int i = 0;
+  while(ch != '\n') {
+    //pthread_mutex_lock(&m);
+    input[i] = ch;
+    //pthread_mutex_unlock(&m);
+    i++;
+    ch = getch();
+  }
+}
 
-void compare_word(FILE* stream, char* input, int* count, int* row) {
-  while(1) {
-    input[0] = getchar();
+// put input word as a global
+void* compare_word(void* p) {
+  int* row = p;
+  // maximum one word on each row
 
-    //compare the first char of words on_screen with input[0]
-    int i = 0;
-    for (; i < ROW_NUM; i++) {
-      if(input[0] == on_screen[i][0]) {
+  // read the length of the string
+  //int length = strlen(input);
+  
+  while(check_running()) {
+    pthread_mutex_lock(&m2);
+    int length = strlen(input);
+    
+    read_input();
+    bool check = true;
+    for(int i = 0; i < length; i++) {
+      pthread_mutex_lock(&m);
+      if(input[i] != on_screen[*row][i]) {
+        check = false;
+        pthread_mutex_unlock(&m);
         break;
       }
+      pthread_mutex_unlock(&m);
     }
-
-    // Specify the row
-    *row = i;
-
-    // lock
-    int size = strlen(on_screen[i]); // does not include null terminator
-  
-    //once locked on, only compare that one
-    char ch = getchar();
-    int j = 1;
-    int counter = 0;
-
-    // loop to check word until every char is matched
-    while (counter != size) {
-      match_letter(i, &j, &counter);
+    if(check) {
+      // increase count
+      //*count++;
+      // clear input
+      for(int i = 0; i < length; i++) {
+        input[i] = '\0';
+      }
+      
     }
-
-    // Delete word from the board
-    // block
-    for (int col = 0; col < BOARD_WIDTH; col++) {
-      board[i][col] = ' ';
-      on_screen[i][col] = ' ';
-    }
-
-    generate_word(stream, i);
-
-    
-    // exit loop means completing match
-    *count++;
-  } // while(1)
-}
-*/
-/*
-int main() {
-  FILE* stream;
-  stream = fopen("small_input.txt", "r");
-  generate_word(stream, 5);
-  for(int i = 0; i < BOARD_HEIGHT; i++) {
-    for(int j = 0; j < BOARD_WIDTH; j++) {
-      printf("%c ", board[i][j]);
-    }
-    printf("\n");
+    pthread_mutex_unlock(&m2);
   }
-}*/
+
+  return NULL;
+}

@@ -13,7 +13,7 @@
 #include "utility.h"
 
 // Game parameters
-#define WORM_HORIZONTAL_INTERVAL 50 // This will be word speed
+#define WORM_HORIZONTAL_INTERVAL 250 // This will be word speed
 #define DRAW_BOARD_INTERVAL 30
 
 #define READ_INPUT_INTERVAL 150
@@ -121,7 +121,7 @@ void* draw_board(void* p) {
   args_thread_t* arg = p;
   int r = arg->row;
   // Need row, need word
-  while(running) {
+  while(check_running()) {
     pthread_mutex_lock(&m);
     // Loop over cells of the game board
     //for (int r=0; r<BOARD_HEIGHT; r++) {
@@ -144,6 +144,7 @@ void* draw_board(void* p) {
   return NULL;
 }
 
+
 /**
  * Run in a thread to move the worm around on the board
  */
@@ -160,7 +161,7 @@ void* move_word(void* p) {
   }
   pthread_mutex_unlock(&m);
   
-  while(running) {
+  while(check_running()) {
     pthread_mutex_lock(&m);
     // Update one thread i.e. one row
     board[row][0] = ' ';
@@ -175,7 +176,7 @@ void* move_word(void* p) {
     // Check for edge collisions
     if(board[row][BOARD_WIDTH - 1] != ' ') {
       running = false;
-      //end_game();
+      end_game();
     }
 
     pthread_mutex_unlock(&m);
@@ -193,8 +194,8 @@ void* run_game(void* p) {
   //generate_word(stream, row);
   //pthread_mutex_unlock(&m);
 
-  pthread_t threads[3];
-  args_thread_t args[3];
+  pthread_t threads[4];
+  args_thread_t args[4];
 
   for(int i = 0; i < 3; i++) {
     args[i].row = row;
@@ -207,9 +208,14 @@ void* run_game(void* p) {
     }
   
   if(pthread_create(&threads[1], NULL, draw_board, &args[1])) {
+    perror("pthread_creates failed\n");
+    exit(2);
+  }
+  /*
+  if(pthread_create(&threads[2], NULL, compare_word, &args[2])) {
       perror("pthread_creates failed\n");
       exit(2);
-  }
+      }*/
 
   if(pthread_create(&threads[2], NULL, move_word, &args[2])) {
       perror("pthread_creates failed\n");
@@ -240,10 +246,9 @@ int main(void) {
   // Seed random number generator with the time in milliseconds
   srand(time_ms());
   
-  noecho();               // Don't print keys when pressed
-  //keypad(mainwin, true);  // Support arrow keys
+  //noecho();               // Don't print keys when pressed
+  keypad(mainwin, true);  // Support arrow keys
   //nodelay(mainwin, true); // Non-blocking keyboard access
-  stream = fopen("./small_input.txt", "r");
   // Initialize the game display
   init_display();
   
@@ -266,6 +271,8 @@ int main(void) {
     printf("%d ",args[i].row);
   }
 */
+  //count = malloc(sizeof(int));
+  //*count = 0;
   
   pthread_t threads[10];
   args_thread_t args[10];
@@ -285,10 +292,8 @@ int main(void) {
   }
 
 
-  //run_game(counter+2);
-
   // Display the end of game message and wait for user input
-  end_game();
+  //end_game();
   
   // Clean up window
   delwin(mainwin);

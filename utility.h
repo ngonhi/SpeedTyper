@@ -18,19 +18,27 @@
 extern char on_screen[ROW_NUM][WORD_LEN];
 extern char board[BOARD_HEIGHT][BOARD_WIDTH];
 extern FILE* stream;
+extern char input[WORD_LEN];
+extern int *count;
 
 extern bool running;
 extern pthread_mutex_t m;
+extern pthread_mutex_t m2;
 
 typedef struct args_thread{
   int row;
   //char * words; // List of words 
 } args_thread_t;
 
+bool is_empty(int row);
+
+bool check_running();
 
 void* generate_word(void* p);
 
-void compare_word(char* input, int* count);
+void read_input();
+
+void* compare_word(void* p);
 
 void* line_work(void* p);
 
