@@ -13,8 +13,8 @@
 #include "utility.h"
 
 // Game parameters
-#define WORM_HORIZONTAL_INTERVAL 250 // This will be word speed
-#define DRAW_BOARD_INTERVAL 30
+#define WORM_HORIZONTAL_INTERVAL 500 // This will be word speed
+#define DRAW_BOARD_INTERVAL 700
 
 #define READ_INPUT_INTERVAL 150
 
@@ -197,7 +197,7 @@ void* run_game(void* p) {
   pthread_t threads[4];
   args_thread_t args[4];
 
-  for(int i = 0; i < 3; i++) {
+  for(int i = 0; i < 4; i++) {
     args[i].row = row;
     //printf("%d ",args[i].row);
   }
@@ -211,18 +211,18 @@ void* run_game(void* p) {
     perror("pthread_creates failed\n");
     exit(2);
   }
-  /*
+  
   if(pthread_create(&threads[2], NULL, compare_word, &args[2])) {
-      perror("pthread_creates failed\n");
-      exit(2);
-      }*/
+    perror("pthread_creates failed\n");
+    exit(2);
+  }
 
-  if(pthread_create(&threads[2], NULL, move_word, &args[2])) {
+  if(pthread_create(&threads[3], NULL, move_word, &args[3])) {
       perror("pthread_creates failed\n");
       exit(2);
   }
 
-  for(int i = 0; i < 3; i++) {
+  for(int i = 0; i < 4; i++) {
     if(pthread_join(threads[i], NULL)) {
       perror("pthread_join main failed\n");
       exit(2);
@@ -247,8 +247,9 @@ int main(void) {
   srand(time_ms());
   
   //noecho();               // Don't print keys when pressed
-  keypad(mainwin, true);  // Support arrow keys
+  //keypad(mainwin, true);  // Support arrow keys
   //nodelay(mainwin, true); // Non-blocking keyboard access
+  cbreak();
   // Initialize the game display
   init_display();
   

@@ -118,7 +118,6 @@ void match_letter(FILE* stream, int i, int* j, int* counter) {
 // helper to read user input
 void read_input() {
   char ch = getch();
-  mvaddch(50, 50, ch);
   int i = 0;
   while(ch != '\n') {
     //pthread_mutex_lock(&m);
@@ -129,6 +128,7 @@ void read_input() {
   }
 }
 
+
 // put input word as a global
 void* compare_word(void* p) {
   int* row = p;
@@ -137,29 +137,36 @@ void* compare_word(void* p) {
   // read the length of the string
   //int length = strlen(input);
   
+  
   while(check_running()) {
     pthread_mutex_lock(&m2);
-    int length = strlen(input);
-    
-    read_input();
+    if(input[0] != ' ') {
+      read_input();
+    }
+    int i = 0;
     bool check = true;
-    for(int i = 0; i < length; i++) {
+    while(input[i] != ' ') {
       pthread_mutex_lock(&m);
       if(input[i] != on_screen[*row][i]) {
         check = false;
         pthread_mutex_unlock(&m);
         break;
       }
+      i++;
       pthread_mutex_unlock(&m);
     }
+    //pthread_mutex_unlock(&m);
     if(check) {
+      pthread_mutex_lock(&m);
       // increase count
       //*count++;
       // clear input
-      for(int i = 0; i < length; i++) {
-        input[i] = '\0';
-      }
+      memset(input, ' ', WORD_LEN);
+      // delete word on screen and on board
+      memset(board[*row], ' ', BOARD_WIDTH);
+      memset(on_screen[*row], ' ', WORD_LEN);
       
+      pthread_mutex_unlock(&m);
     }
     pthread_mutex_unlock(&m2);
   }
