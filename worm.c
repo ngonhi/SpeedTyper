@@ -246,7 +246,7 @@ int main(void) {
   // Seed random number generator with the time in milliseconds
   srand(time_ms());
   
-  //noecho();               // Don't print keys when pressed
+  noecho();               // Don't print keys when pressed
   //keypad(mainwin, true);  // Support arrow keys
   //nodelay(mainwin, true); // Non-blocking keyboard access
   cbreak();

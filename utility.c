@@ -122,13 +122,14 @@ void read_input() {
   while(ch != '\n') {
     //pthread_mutex_lock(&m);
     input[i] = ch;
+    //mvaddch(screen_row(), screen_col())
     //pthread_mutex_unlock(&m);
     i++;
     ch = getch();
   }
 }
 
-
+// Add a null terminator
 // put input word as a global
 void* compare_word(void* p) {
   int* row = p;
@@ -140,8 +141,9 @@ void* compare_word(void* p) {
   
   while(check_running()) {
     pthread_mutex_lock(&m2);
-    if(input[0] != ' ') {
+    if(input[0] == ' ') {
       read_input();
+      // Set counter to 0
     }
     int i = 0;
     bool check = true;
