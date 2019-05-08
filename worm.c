@@ -126,15 +126,17 @@ void* draw_board(void* p) {
     // Loop over cells of the game board
     //for (int r=0; r<BOARD_HEIGHT; r++) {
       for(int c=0; c<BOARD_WIDTH; c++) {
-        mvaddch(screen_row(r), screen_col(c), board[r][c]);
+        printf("%c", board[r][c]);
+        //mvaddch(screen_row(r), screen_col(c), board[r][c]);
       }
+      printf("\n");
     //}
   
   // Draw the score
-  mvprintw(screen_row(-2), screen_col(BOARD_WIDTH-9), "Score 100\r"); // Get the count
+  //mvprintw(screen_row(-2), screen_col(BOARD_WIDTH-9), "Score 100\r"); // Get the count
   
   // Refresh the display
-  refresh();
+  //refresh();
 
   pthread_mutex_unlock(&m);
   // Sleep for a while before drawing the board again
@@ -235,13 +237,14 @@ void* run_game(void* p) {
 
 // Entry point: Set up the game, create jobs, then run the scheduler
 int main(void) {
+
   stream = fopen("input.txt", "r");
   //Initialize the ncurses window
-  WINDOW* mainwin = initscr();
+  /*WINDOW* mainwin = initscr();
   if(mainwin == NULL) {
     fprintf(stderr, "Error initializing ncurses.\n");
     exit(2);
-  }
+  }*/
   
   // Seed random number generator with the time in milliseconds
   srand(time_ms());
@@ -249,13 +252,14 @@ int main(void) {
   //noecho();               // Don't print keys when pressed
   //keypad(mainwin, true);  // Support arrow keys
   //nodelay(mainwin, true); // Non-blocking keyboard access
-  cbreak();
+  //cbreak();
   // Initialize the game display
-  init_display();
+  //init_display();
   
   // Zero out the board contents
   memset(board, ' ', BOARD_WIDTH*BOARD_HEIGHT*sizeof(char));
-
+  memset(input, ' ', WORD_LEN*sizeof(char));
+  memset(on_screen, ' ', WORD_LEN*ROW_NUM*sizeof(char));
 /*
   for(int i = 0; i < BOARD_HEIGHT; i++) {
     for(int j = 0; j < BOARD_WIDTH; j++) {
@@ -297,8 +301,8 @@ int main(void) {
   //end_game();
   
   // Clean up window
-  delwin(mainwin);
-  endwin();
+  //delwin(mainwin);
+  //endwin();
 
   fclose(stream);
   return 0;
