@@ -41,6 +41,7 @@ int count_thread;
 bool running = true;
 pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t m2 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t m3 = PTHREAD_MUTEX_INITIALIZER;
 
 // Worm parameters
 //int worm_dir = DIR_NORTH;
@@ -313,7 +314,9 @@ void* compare_word(void* p) {
     pthread_mutex_lock(&m2);
     if(input[0] == ' ') {
       read_input();
+      pthread_mutex_lock(&m3);
       count_thread = 0;
+      pthread_mutex_unlock(&m3);
     }
     pthread_mutex_unlock(&m2);
     
@@ -345,7 +348,10 @@ void* compare_word(void* p) {
       
       // clear
       for(int i = 0; i < WORD_LEN; i++) {
+        pthread_mutex_lock(&m2);
         input[i] = ' ';
+        mvaddch(screen_row(BOARD_HEIGHT + 3), screen_col(BOARD_WIDTH + 5 + i), ' ');
+        pthread_mutex_unlock(&m2);
         on_screen[row][i] = ' ';
       }
       // delete word on screen and on board
@@ -353,16 +359,25 @@ void* compare_word(void* p) {
         board[row][i] = ' ';
       }
     } else {
+      pthread_mutex_lock(&m3);
       count_thread++;
+      pthread_mutex_unlock(&m3);
     }
 
+pthread_mutex_lock(&m3);
     mvprintw(screen_row(BOARD_HEIGHT + 5), screen_col(BOARD_WIDTH + 5), "count_thread = %d", count_thread);  
+    pthread_mutex_unlock(&m3);
       // check if there is no match and clear the buffer if so
+    pthread_mutex_lock(&m3);
       if (count_thread == 10) {
         for(int i = 0; i < WORD_LEN; i++) {
+          pthread_mutex_lock(&m2);
           input[i] = ' ';
+          mvaddch(screen_row(BOARD_HEIGHT + 3), screen_col(BOARD_WIDTH + 5 + i), ' ');
+          pthread_mutex_unlock(&m2);
         }
       }
+      pthread_mutex_unlock(&m3);
     pthread_mutex_unlock(&m);
 
    
