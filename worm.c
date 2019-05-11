@@ -12,7 +12,7 @@
 #include "util.h"
 
 #define WORD_LEN 50
-#define ROW_NUM 10
+#define ROW_NUM 2
 #define BOARD_WIDTH 50
 #define BOARD_HEIGHT 20 // Every two rows has one thread of words
 
@@ -573,9 +573,9 @@ int main(void) {
     }
   }
   
-  pthread_t threads[10];
-  args_thread_t args[10];
-  for(int i = 0; i < 10; i++) {
+  pthread_t threads[2];
+  args_thread_t args[2];
+  for(int i = 0; i < 2; i++) {
     args[i].row = i*2;
     if(pthread_create(&threads[i], NULL, run_game, &args[i])) {
       perror("pthread_creates failed\n");
@@ -583,7 +583,7 @@ int main(void) {
     }
   }
   
-  for(int i = 0; i < 10; i++) {
+  for(int i = 0; i < 2; i++) {
     if(pthread_join(threads[i], NULL)) {
       perror("pthread_join main failed\n");
       exit(2);
