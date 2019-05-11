@@ -325,8 +325,8 @@ void* compare_word(void* p) {
 
       if(strcmp(input, on_screen[row]) != 0) {
         check = false;
-        pthread_mutex_unlock(&m);
-        break;
+        //pthread_mutex_unlock(&m);
+        //break;
       }
       /*
       if(input[i] != on_screen[row][i]) {
@@ -336,11 +336,11 @@ void* compare_word(void* p) {
       }
       */
       //i++;
-      pthread_mutex_unlock(&m);
+      //pthread_mutex_unlock(&m);
       //} // while empty
     //pthread_mutex_unlock(&m);
 
-    pthread_mutex_lock(&m);
+    //pthread_mutex_lock(&m);
     if(check) {
       
       // clear
@@ -354,14 +354,15 @@ void* compare_word(void* p) {
       }
     } else {
       count_thread++;
+    }
 
+    mvprintw(screen_row(BOARD_HEIGHT + 5), screen_col(BOARD_WIDTH + 5), "count_thread = %d", count_thread);  
       // check if there is no match and clear the buffer if so
       if (count_thread == 10) {
         for(int i = 0; i < WORD_LEN; i++) {
           input[i] = ' ';
         }
       }
-    } // if check
     pthread_mutex_unlock(&m);
 
    
