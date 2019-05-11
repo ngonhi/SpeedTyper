@@ -39,12 +39,27 @@ int main(void) {
     exit(2);
   }
 
-  char c =fgetc(stream);
-  while(c != '\n') {
-    //printf("%c\n", c);
-    offset++;
-    c = fgetc(stream);
+  char c;
+  if((c = fgetc(stream)) == EOF) {
+    if (ferror(stream) == 0) {
+      fprintf(stderr, "Error read char from input file 1\n");
+      exit(2);
+    }
   }
+  while(c != '\n' && c != EOF) {
+    if (c == '\n') {
+      printf("newline in here\n");
+    }
+    offset++;
+    //printf("offset = %d\n", offset);
+    if((c = fgetc(stream)) == EOF) {
+      if (ferror(stream) == 0) {
+        fprintf(stderr, "Error read char from input file 2\n");
+        exit(2);
+      }
+    }
+  }
+  printf("offset = %d\n", offset);
 
   offset += 1; // Move to new word
 
@@ -57,12 +72,23 @@ int main(void) {
   int j = 0;
   
 
-  char ch = fgetc(stream);
-  while(ch != '\n') {
+  char ch;
+  if((ch = fgetc(stream)) == EOF) {
+    if (ferror(stream) == 0) {
+      fprintf(stderr, "Error read char from input file 2\n");
+      exit(2);
+    }
+  }
+  while(ch != '\n' && ch != EOF) {
     word[j] = ch;
     j++;
-    printf("j = %d\n", j);
-    ch = fgetc(stream);
+    //printf("j = %d\n", j);
+    if((ch = fgetc(stream)) == EOF) {
+      if (ferror(stream) == 0) {
+        fprintf(stderr, "Error read char from input file 2\n");
+        exit(2);
+      }
+    }
   }
 
   word[j] = '\0';

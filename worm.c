@@ -17,7 +17,7 @@
 #define BOARD_HEIGHT 20 // Every two rows has one thread of words
 
 // Game parameters
-#define WORM_HORIZONTAL_INTERVAL 200 // This will be word speed
+#define WORM_HORIZONTAL_INTERVAL 500 // This will be word speed
 #define DRAW_BOARD_INTERVAL 700
 
 #define READ_INPUT_INTERVAL 150
@@ -182,9 +182,10 @@ void* generate_word(void* p) {
         exit(2);
       }
   
-      int offset = rand() % size;
+      int offset = rand() % size; //check rand
       while(offset > size-8) {
         offset = rand() % size;
+        printf("offset = %d\n", offset);
       }
 
       if(fseek(stream, offset, SEEK_SET) != 0) {
@@ -192,11 +193,22 @@ void* generate_word(void* p) {
         exit(2);
       }
 
-      char c =fgetc(stream);
-      while(c != '\n') {
-        offset++;
-        c = fgetc(stream);
+      char c;
+      if((c = fgetc(stream)) == EOF) {
+        if (ferror(stream) == 0) {
+          fprintf(stderr, "Error read char from input file 1\n");
+          exit(2);
+        }
       }
+      while(c != '\n' && c != EOF) {
+        offset++;
+        if((c = fgetc(stream)) == EOF) {
+          if (ferror(stream) == 0) {
+            fprintf(stderr, "Error read char from input file 2\n");
+            exit(2);
+          }
+        }
+    }
 
       offset += 1; // Move to new word
 
@@ -207,14 +219,24 @@ void* generate_word(void* p) {
 
       int j = 0;
   
-      char ch = fgetc(stream);
-      while(ch != '\n') {
-        
+      char ch;
+      if((ch = fgetc(stream)) == EOF) {
+        if (ferror(stream) == 0) {
+          fprintf(stderr, "Error read char from input file 3\n");
+          exit(2);
+        }
+      }
+      while(ch != '\n' && ch != EOF) {
         on_screen[row][j] = ch;
         board[row][j] = ch;
         j++;
-        ch = fgetc(stream);
-        
+        //printf("%c\n", ch);
+        if((ch = fgetc(stream)) == EOF) {
+          if (ferror(stream) == 0) {
+            fprintf(stderr, "Error read char from input file 4\n");
+            exit(2);
+          }
+        }
       }
     }
     pthread_mutex_unlock(&m);
@@ -236,15 +258,23 @@ void match_letter(FILE* stream, int i, int* j, int* counter) {
 
 // helper to read user input
 void read_input() {
-  char ch = getch();
+  char ch;
+  if((ch = getch()) == ERR) {
+    fprintf(stderr, "getch fails\n");
+    exit(2);
+  } 
   int i = 0;
   while(ch != '\n') {
     
     input[i] = ch;
-    mvaddch(screen_row(BOARD_HEIGHT + 3), screen_col(BOARD_WIDTH + 5), ch);
-    
+    //pthread_mutex_lock(&m);
+    mvaddch(screen_row(BOARD_HEIGHT + 3), screen_col(BOARD_WIDTH + 5 + i), ch);
+    // pthread_mutex_unlock(&m);
     i++;
-    ch = getch();
+    if((ch = getch()) == ERR) {
+      fprintf(stderr, "getch fails\n");
+      exit(2);
+    } 
   }
 }
 
@@ -265,7 +295,7 @@ void* compare_word(void* p) {
       read_input();
       count_thread = 0;
     }
-    pthread_mutex_lock(&m2);
+    pthread_mutex_unlock(&m2);
     
     int i = 0;
     bool check = true;
@@ -441,7 +471,10 @@ void* run_game(void* p) {
 
 // Entry point: Set up the game, create jobs, then run the scheduler
 int main(void) {
-  stream = fopen("input.txt", "r");
+  if ((stream = fopen("input.txt", "r")) == NULL) {
+    fprintf(stderr, "Error opening input file");
+    exit(2);
+  } // Check error
   //Initialize the ncurses window
   WINDOW* mainwin = initscr();
   if(mainwin == NULL) {
@@ -490,9 +523,9 @@ int main(void) {
     }
   }
   
-  pthread_t threads[1];
-  args_thread_t args[1];
-  for(int i = 0; i < 1; i++) {
+  pthread_t threads[10];
+  args_thread_t args[10];
+  for(int i = 0; i < 10; i++) {
     args[i].row = i*2;
     if(pthread_create(&threads[i], NULL, run_game, &args[i])) {
       perror("pthread_creates failed\n");
@@ -500,7 +533,7 @@ int main(void) {
     }
   }
   
-  for(int i = 0; i < 1; i++) {
+  for(int i = 0; i < 10; i++) {
     if(pthread_join(threads[i], NULL)) {
       perror("pthread_join main failed\n");
       exit(2);
@@ -512,8 +545,8 @@ int main(void) {
   //end_game();
   
   // Clean up window
-  //delwin(mainwin);
-  //endwin();
+  delwin(mainwin);
+  endwin();
 
   fclose(stream);
   return 0;
