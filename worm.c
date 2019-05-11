@@ -17,7 +17,7 @@
 #define BOARD_HEIGHT 20 // Every two rows has one thread of words
 
 // Game parameters
-#define WORM_HORIZONTAL_INTERVAL 500 // This will be word speed
+#define WORM_HORIZONTAL_INTERVAL 700 // This will be word speed
 #define DRAW_BOARD_INTERVAL 700
 
 #define READ_INPUT_INTERVAL 150
@@ -188,11 +188,12 @@ void* generate_word(void* p) {
         printf("offset = %d\n", offset);
       }
 
+      
       if(fseek(stream, offset, SEEK_SET) != 0) {
         perror("Unable to seek to offset");
         exit(2);
       }
-
+      
       char c;
       if((c = fgetc(stream)) == EOF) {
         if (ferror(stream) == 0) {
@@ -208,52 +209,70 @@ void* generate_word(void* p) {
             exit(2);
           }
         }
-    }
+      }
 
       offset += 1; // Move to new word
 
+      // reach the point to start reading
       if(fseek(stream, offset, SEEK_SET) != 0) {
         perror("Unable to seek to offset");
         exit(2);
       }
 
-      int j = 0;
-  
-      char ch;
-      if((ch = fgetc(stream)) == EOF) {
-        if (ferror(stream) == 0) {
-          fprintf(stderr, "Error read char from input file 3\n");
-          exit(2);
+      char* string = NULL;
+      size_t len = 0;
+      ssize_t nread;
+      if((nread = getline(&string, &len, stream)) != -1) {
+        for (int i = 0; i < nread-1; i++) {
+          on_screen[row][i] = *(string+i);
+          board[row][i] = *(string+i);
         }
+        
       }
-      while(ch != '\n' && ch != EOF) {
+      on_screen[row][nread-1] = '\0';
+      //board[row][nread-1] = ' ';
+      //on_screen[row][nread-1] = ' ';
+      
+      /*
+        int j = 0;
+  
+        char ch;
+        if((ch = fgetc(stream)) == EOF) {
+        if (ferror(stream) == 0) {
+        fprintf(stderr, "Error read char from input file 3\n");
+        exit(2);
+        }
+        }
+        while(ch != '\n' && ch != EOF) {
         on_screen[row][j] = ch;
         board[row][j] = ch;
         j++;
         //printf("%c\n", ch);
         if((ch = fgetc(stream)) == EOF) {
-          if (ferror(stream) == 0) {
-            fprintf(stderr, "Error read char from input file 4\n");
-            exit(2);
-          }
+        if (ferror(stream) == 0) {
+        fprintf(stderr, "Error read char from input file 4\n");
+        exit(2);
         }
-      }
+        }
+        }
+      */
+      free(string);
     }
     pthread_mutex_unlock(&m);
-  } //while running
+  } // while running
   return NULL;
 }
 
 // helper for compare_word
 /*
-void match_letter(FILE* stream, int i, int* j, int* counter) {
+  void match_letter(FILE* stream, int i, int* j, int* counter) {
   char ch = getchar();
   while(ch != '\n' && ch == on_screen[i][*j]) {
-    *j++;
-    *counter++;
-    ch = getchar();
+  *j++;
+  *counter++;
+  ch = getchar();
   }
-}
+  }
 */
 
 // helper to read user input
@@ -276,6 +295,7 @@ void read_input() {
       exit(2);
     } 
   }
+  input[i] = '\0';
 }
 
 // Add a null terminator
@@ -297,30 +317,39 @@ void* compare_word(void* p) {
     }
     pthread_mutex_unlock(&m2);
     
-    int i = 0;
+    //int i = 0;
     bool check = true;
     // Input can be read by multiple threads
-    while(check_not_empty()) {
+    //while(check_not_empty()) {
       pthread_mutex_lock(&m);
+
+      if(strcmp(input, on_screen[row]) != 0) {
+        check = false;
+        pthread_mutex_unlock(&m);
+        break;
+      }
+      /*
       if(input[i] != on_screen[row][i]) {
         check = false;
         pthread_mutex_unlock(&m);
         break;
       }
-      i++;
+      */
+      //i++;
       pthread_mutex_unlock(&m);
-    } // while empty
+      //} // while empty
     //pthread_mutex_unlock(&m);
 
     pthread_mutex_lock(&m);
     if(check) {
+      
       // clear
       for(int i = 0; i < WORD_LEN; i++) {
         input[i] = ' ';
         on_screen[row][i] = ' ';
       }
       // delete word on screen and on board
-       for(int i = 0; i < BOARD_WIDTH; i++) {
+      for(int i = 0; i < BOARD_WIDTH; i++) {
         board[row][i] = ' ';
       }
     } else {
@@ -390,15 +419,20 @@ void* move_word(void* p) {
   int row = arg->row;
   char temp[BOARD_WIDTH];
 
-  // Init change to memcpy
+  /* Init change to memcpy
   pthread_mutex_lock(&m);
   for (int i=0; i < BOARD_WIDTH; i++) {
     temp[i] = board[row][i];
   }
-  pthread_mutex_unlock(&m);
+  pthread_mutex_unlock(&m);*/
   
   while(check_running()) {
     pthread_mutex_lock(&m);
+
+    for (int i=0; i < BOARD_WIDTH; i++) {
+      temp[i] = board[row][i];
+    }
+    
     // Update one thread i.e. one row
     board[row][0] = ' ';
     for (int col=1; col < BOARD_WIDTH; col++) {
