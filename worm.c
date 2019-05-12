@@ -9,13 +9,15 @@
 #include <time.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include "util.h"
+#include "list.h"
 
 #define WORD_LEN 50
 #define ROW_NUM 10
 #define BOARD_WIDTH 50
-#define BOARD_HEIGHT 20 // Every two rows has one thread of words
+#define BOARD_HEIGHT 10 // Every two rows has one thread of words
 
 // Game parameters
 //#define WORM_HORIZONTAL_INTERVAL 700 // This will be word speed
@@ -47,7 +49,8 @@ pthread_mutex_t m4 = PTHREAD_MUTEX_INITIALIZER; // counter
 pthread_mutex_t m5 = PTHREAD_MUTEX_INITIALIZER; // running
 
 int counter = 0;
-size_t interval[ROW_NUM] = {0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000};
+size_t interval[ROW_NUM] = {0};
+linkedlist_t* list = NULL;
 
 
 /**
@@ -219,8 +222,6 @@ void* generate_word(void* p) {
       }
 
       on_screen[row][nread-1] = '\0';
-      //board[row][nread-1] = ' ';
-      //on_screen[row][nread-1] = ' ';
       free(string);
     }
     pthread_mutex_unlock(&m);
@@ -251,6 +252,31 @@ void read_input() {
   input[i] = '\0';
 }
 
+void* check_thread() {
+  while(check_running()) {
+    // sleep_ms(100);
+  }
+  // terminate all other threads
+  pthread_mutex_lock(&list->lst_m);
+  node_t* cur = list->first;
+  int i = 0;
+  
+  while(i < list->length) {
+    pthread_t cur_thread = cur->thread;
+    if(pthread_kill(cur_thread, SIGSTOP) != 0) {
+      perror("cannot kill thread");
+      exit(2);
+    }
+    cur = cur->next;
+    i++;
+  }
+  pthread_mutex_lock(&list->lst_m);
+  
+  return NULL;
+}
+
+
+
 // Add a null terminator
 // put input word as a global
 void* compare_word(void* p) {
@@ -259,6 +285,7 @@ void* compare_word(void* p) {
   
   while(check_running()) {
     bool check = true; // might be a prob
+   
     pthread_mutex_lock(&m2);
     if(input[0] == ' ') {
       read_input();
@@ -269,7 +296,7 @@ void* compare_word(void* p) {
     } else{
       pthread_mutex_unlock(&m2);
     }
-
+    
     // Ori check
     
     // Input can be read by multiple threads
@@ -311,7 +338,8 @@ void* compare_word(void* p) {
     }
 
     pthread_mutex_lock(&m3);
-    mvprintw(screen_row(BOARD_HEIGHT + 5), screen_col(BOARD_WIDTH + 5), "count_thread = %d", count_thread);  
+    mvprintw(screen_row(BOARD_HEIGHT + 5), screen_col(BOARD_WIDTH + 5), "count_thread = %d", count_thread);
+    
       if (count_thread >= 10) {
          pthread_mutex_unlock(&m3);
         for(int i = 0; i < WORD_LEN; i++) {
@@ -349,7 +377,6 @@ void* draw_board(void* p) {
     //for (int r=0; r<BOARD_HEIGHT; r++) {
     for(int c=0; c<BOARD_WIDTH; c++) {
       mvaddch(screen_row(r), screen_col(c), board[r][c]);
-      //printf("DRAWING\n");
     }
     //}
   
@@ -357,6 +384,10 @@ void* draw_board(void* p) {
     pthread_mutex_lock(&m4);
     mvprintw(screen_row(-2), screen_col(BOARD_WIDTH-9), "Score = %d", counter); // Get the count
     pthread_mutex_unlock(&m4);
+
+    pthread_mutex_lock(&list->lst_m);
+    mvprintw(screen_row(-2), screen_col(BOARD_WIDTH + 10), "l = %d", list->length);
+    pthread_mutex_unlock(&list->lst_m);
     // Refresh the display
     refresh();
 
@@ -378,12 +409,6 @@ void* move_word(void* p) {
   int row = arg->row;
   char temp[BOARD_WIDTH];
 
-  /* Init change to memcpy
-  pthread_mutex_lock(&m);
-  for (int i=0; i < BOARD_WIDTH; i++) {
-    temp[i] = board[row][i];
-  }
-  pthread_mutex_unlock(&m);*/
   
   while(check_running()) {
     pthread_mutex_lock(&m);
@@ -398,17 +423,16 @@ void* move_word(void* p) {
       board[row][col] = temp[col - 1];
     } // for col
 
-    for (int i=0; i < BOARD_WIDTH; i++) {
-      temp[i] = board[row][i];
-    }
-
     // Check for edge collisions
     if(board[row][BOARD_WIDTH - 1] != ' ') {
+      pthread_mutex_lock(&m5);
       running = false;
-      end_game();
+      pthread_mutex_unlock(&m5);
+      //return NULL;
     }
 
     pthread_mutex_unlock(&m);
+    
     sleep_ms(WORM_HORIZONTAL_INTERVAL);   
   } // while
 
@@ -435,21 +459,29 @@ void* run_game(void* p) {
   if(pthread_create(&threads[0], NULL, generate_word, &args[0])) {
     perror("pthread_creates failed\n");
     exit(2);
+  } else {
+    addNode(list, threads[0]);
   }
   
   if(pthread_create(&threads[1], NULL, draw_board, &args[1])) {
     perror("pthread_creates failed\n");
     exit(2);
+  } else {
+    addNode(list, threads[1]);
   }
   
   if(pthread_create(&threads[2], NULL, compare_word, &args[2])) {
     perror("pthread_creates failed\n");
     exit(2);
+  } else {
+    addNode(list, threads[2]);
   }
 
   if(pthread_create(&threads[3], NULL, move_word, &args[3])) {
     perror("pthread_creates failed\n");
     exit(2);
+  } else {
+    addNode(list, threads[3]);
   }
 
   for(int i = 0; i < 4; i++) {
@@ -503,6 +535,7 @@ void read_user_command(void) {
 int main(void) {
   user_menu();
   read_user_command();
+  list = listInit();
 
   if ((stream = fopen("input.txt", "r")) == NULL) {
     fprintf(stderr, "Error opening input file");
@@ -544,6 +577,12 @@ int main(void) {
       on_screen[i][j] = ' ';
     }
   }
+  pthread_t check;
+  if(pthread_create(&check, NULL, check_thread, NULL)) {
+    perror("pthread_creates failed\n");
+    exit(2);
+  }
+  
   
   pthread_t threads[ROW_NUM];
   args_thread_t args[ROW_NUM];
@@ -552,6 +591,8 @@ int main(void) {
     if(pthread_create(&threads[i], NULL, run_game, &args[i])) {
       perror("pthread_creates failed\n");
       exit(2);
+    } else {
+      addNode(list, threads[i]);
     }
   }
   
@@ -562,15 +603,22 @@ int main(void) {
     }
   }
 
+  if(pthread_join(check, NULL)) {
+      perror("pthread_join main failed\n");
+      exit(2);
+   }
+
 
   // Display the end of game message and wait for user input
-  //end_game();
+  // end_game();
   
   // Clean up window
-  delwin(mainwin);
-  endwin();
+  // delwin(mainwin);
+  //endwin();
 
-  fclose(stream);
+  //destroyList(list);
+
+  //fclose(stream);
   return 0;
 } // main
 

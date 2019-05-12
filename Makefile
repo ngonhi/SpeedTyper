@@ -6,5 +6,5 @@ all: worm
 clean:
 	rm -rf worm worm.dSYM
 
-worm: worm.c util.c util.h
-	$(CC) $(CFLAGS) -o worm worm.c util.c -lncurses
+worm: worm.c util.c util.h list.c list.h
+	$(CC) $(CFLAGS) -o worm worm.c util.c list.c -lncurses
