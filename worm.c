@@ -1,4 +1,5 @@
 #include <curses.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -11,16 +12,19 @@
 
 #include "util.h"
 
+
 #define WORD_LEN 50
 #define ROW_NUM 10
 #define BOARD_WIDTH 50
 #define BOARD_HEIGHT 20 // Every two rows has one thread of words
 
 // Game parameters
-#define WORM_HORIZONTAL_INTERVAL 700 // This will be word speed
+//#define WORM_HORIZONTAL_INTERVAL 700 // This will be word speed
 #define DRAW_BOARD_INTERVAL 700
 
 #define READ_INPUT_INTERVAL 150
+
+int WORM_HORIZONTAL_INTERVAL;
 
 typedef struct args_thread{
   int row;
@@ -51,6 +55,10 @@ pthread_mutex_t m3 = PTHREAD_MUTEX_INITIALIZER;
 // Is the game running?
 
 int counter = 0;
+
+// Things to do
+// 1. Scoring
+// 2. User specify row_num and speed
 
 
 /**
@@ -370,7 +378,7 @@ pthread_mutex_lock(&m3);
     pthread_mutex_unlock(&m3);
       // check if there is no match and clear the buffer if so
     pthread_mutex_lock(&m3);
-      if (count_thread == 10) {
+      if (count_thread >= 10) {
         for(int i = 0; i < WORD_LEN; i++) {
           pthread_mutex_lock(&m2);
           input[i] = ' ';
@@ -520,8 +528,48 @@ void* run_game(void* p) {
 }
 
 
+// print menu
+void user_menu() {
+  printf("Welcome to Speed Typer!\n");
+  printf("Enter one of the following Commands:\n\n");
+  printf("\tHelp - Instruction for the Speed Typer'\n");
+  printf("\tPlay - Start the Speed Typer\n");
+  printf("\tQuit - Exit the Speed Typer\n");
+  printf("Enter Commands: ");
+}
+
+void read_user_command(void) {
+  char command[WORD_LEN];
+  scanf("%s", command);
+  for(int i = 0; command[i]; i++) {
+    command[i] = tolower(command[i]);
+  }
+  
+  if(strcmp(command, "help") == 0) {
+    printf("\n\nSpeed Typer is a typing game aiming to provide users with interesting typing experience.\nThe user needs to type out the words appeared on the screenbefore they reached the border on the other side.\nHit enter after typing one word and if the word is correctly typed, the word will disappear from the screen and your score shown on the right hand corner will increment by 1.\nLet us get our fingering moving and enjoy the game!\n\n\n");
+    
+    user_menu();
+    read_user_command();
+  } else if(strcmp(command, "play") == 0) {
+    //printf("Enter the number of rows you would like to challenge (1 - 20): ");
+    //scanf("%d", &ROW_NUM);
+    //printf("ROW_NUMBER = %d\n", ROW_NUM);
+    printf("Enter the speed level you would like to challenge (300 - 1000): ");
+    scanf("%d", &WORM_HORIZONTAL_INTERVAL);
+    printf("SPEED = %d\n", WORM_HORIZONTAL_INTERVAL);
+  } else if(strcmp(command, "quit") == 0) {
+    exit(0);
+  } else {
+    printf("Invalid command. Try again!\nPlease enter command: ");
+    read_user_command();
+  }
+}
+
 // Entry point: Set up the game, create jobs, then run the scheduler
 int main(void) {
+  user_menu();
+  read_user_command();
+  
   if ((stream = fopen("input.txt", "r")) == NULL) {
     fprintf(stderr, "Error opening input file");
     exit(2);
