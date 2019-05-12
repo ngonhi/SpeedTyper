@@ -198,7 +198,7 @@ void* generate_word(void* p) {
       char c;
       if((c = fgetc(stream)) == EOF) {
         if (ferror(stream) == 0) {
-          fprintf(stderr, "Error read char from input file 1\n");
+          perror("Error read char from input file 1");
           exit(2);
         }
       }
@@ -206,7 +206,7 @@ void* generate_word(void* p) {
         offset++;
         if((c = fgetc(stream)) == EOF) {
           if (ferror(stream) == 0) {
-            fprintf(stderr, "Error read char from input file 2\n");
+            perror("Error read char from input file 2");
             exit(2);
           }
         }
@@ -227,6 +227,7 @@ void* generate_word(void* p) {
         for (int i = 0; i < nread-1; i++) {
           on_screen[row][i] = *(string+i);
           board[row][i] = *(string+i);
+          mvprintw(screen_row(BOARD_HEIGHT + 10), screen_col(BOARD_WIDTH + i), "%c", on_screen[row][i]);
         }
         
       }
@@ -576,7 +577,7 @@ int main(void) {
   pthread_t threads[10];
   args_thread_t args[10];
   for(int i = 0; i < 10; i++) {
-    args[i].row = i*2;
+    args[i].row = i;
     if(pthread_create(&threads[i], NULL, run_game, &args[i])) {
       perror("pthread_creates failed\n");
       exit(2);
