@@ -25,6 +25,7 @@
 
 #define READ_INPUT_INTERVAL 150
 int WORM_HORIZONTAL_INTERVAL;
+
 typedef struct args_thread{
   int row;
   //char * words; // List of words 
@@ -40,7 +41,7 @@ char board[BOARD_HEIGHT][BOARD_WIDTH];
 char on_screen[ROW_NUM][WORD_LEN];
 FILE* stream;
 char input[WORD_LEN];
-int count_thread;
+// int count_thread;
 bool running = true;
 pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER; // board, on_screen
 pthread_mutex_t m2 = PTHREAD_MUTEX_INITIALIZER; // input
@@ -48,8 +49,14 @@ pthread_mutex_t m3 = PTHREAD_MUTEX_INITIALIZER; // count_thread
 pthread_mutex_t m4 = PTHREAD_MUTEX_INITIALIZER; // counter
 pthread_mutex_t m5 = PTHREAD_MUTEX_INITIALIZER; // running
 
+pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t lock_cv = PTHREAD_MUTEX_INITIALIZER;
+
 int counter = 0;
 size_t interval[ROW_NUM] = {0};
+
+bool check_compare[ROW_NUM];
+
 linkedlist_t* list = NULL;
 
 
@@ -284,14 +291,16 @@ void* compare_word(void* p) {
   int row = arg->row;
   
   while(check_running()) {
-    bool check = true; // might be a prob
+    //bool check = true; // might be a prob
    
     pthread_mutex_lock(&m2);
     if(input[0] == ' ') {
       read_input();
       pthread_mutex_unlock(&m2);
       pthread_mutex_lock(&m3);
-      count_thread = 0;
+      for (int i = 0; i<ROW_NUM; i++) {
+        check_compare[i] = true;
+      }
       pthread_mutex_unlock(&m3);
     } else{
       pthread_mutex_unlock(&m2);
@@ -305,51 +314,57 @@ void* compare_word(void* p) {
       pthread_mutex_unlock(&m);
       pthread_mutex_lock(&m2);
       if(strcmp(input, temp) != 0) {
-        check = false;
+        //check = false;
+        pthread_mutex_lock(&m3); // m3 is currently for check_compare
+        check_compare[row] = false;
+        pthread_mutex_unlock(&m3);
       }
       pthread_mutex_unlock(&m2);
 
-    //pthread_mutex_lock(&m);
-    if(check) {
-      pthread_mutex_lock(&m4);
-      counter++;
-      pthread_mutex_unlock(&m4);
-      // clear
-      pthread_mutex_lock(&m2);
-      for(int i = 0; i < WORD_LEN; i++) {
-        
-        input[i] = ' ';
-        mvaddch(screen_row(BOARD_HEIGHT/2), screen_col(BOARD_WIDTH + 3 + i), ' ');
-      }
-        pthread_mutex_unlock(&m2);
-        pthread_mutex_lock(&m);
-       for(int i = 0; i < WORD_LEN; i++) { 
-        on_screen[row][i] = ' ';
-      }
-      // delete word on screen and on board
-      for(int i = 0; i < BOARD_WIDTH; i++) {
-        board[row][i] = ' ';
-      }
-      pthread_mutex_unlock(&m);
-    } else {
       pthread_mutex_lock(&m3);
-      count_thread++;
-      pthread_mutex_unlock(&m3);
-    }
-
-    pthread_mutex_lock(&m3);
-    mvprintw(screen_row(BOARD_HEIGHT + 5), screen_col(BOARD_WIDTH + 5), "count_thread = %d", count_thread);
-    
-      if (count_thread >= 10) {
-         pthread_mutex_unlock(&m3);
+      if(check_compare[row]) {
+        pthread_mutex_unlock(&m3);
+        pthread_mutex_lock(&m4);
+        counter++;
+        pthread_mutex_unlock(&m4);
+        // clear
+        pthread_mutex_lock(&m2);
         for(int i = 0; i < WORD_LEN; i++) {
-          pthread_mutex_lock(&m2);
+        
           input[i] = ' ';
           mvaddch(screen_row(BOARD_HEIGHT/2), screen_col(BOARD_WIDTH + 3 + i), ' ');
-          pthread_mutex_unlock(&m2);
         }
+        pthread_mutex_unlock(&m2);
+        pthread_mutex_lock(&m);
+        for(int i = 0; i < WORD_LEN; i++) { 
+          on_screen[row][i] = ' ';
+        }
+        // delete word on screen and on board
+        for(int i = 0; i < BOARD_WIDTH; i++) {
+          board[row][i] = ' ';
+        }
+        pthread_mutex_unlock(&m);
       } else {
-    pthread_mutex_unlock(&m3);
+        bool check = false;
+        for (int i = 0; i<ROW_NUM; i++) {
+          if (check_compare[i]) {
+            check = true;
+          }
+        }
+        pthread_mutex_unlock(&m3);
+
+        if(!check) {
+          for(int i = 0; i < WORD_LEN; i++) {
+            pthread_mutex_lock(&m2);
+            input[i] = ' ';
+            mvaddch(screen_row(BOARD_HEIGHT/2), screen_col(BOARD_WIDTH + 3 + i), ' ');
+            pthread_mutex_unlock(&m2);
+          }
+      
+        }
+        //pthread_mutex_lock(&m3);
+        //count_thread++;
+        //pthread_mutex_unlock(&m3);
       }
   } // while running
 
@@ -577,6 +592,7 @@ int main(void) {
       on_screen[i][j] = ' ';
     }
   }
+  
   pthread_t check;
   if(pthread_create(&check, NULL, check_thread, NULL)) {
     perror("pthread_creates failed\n");
@@ -592,9 +608,13 @@ int main(void) {
       perror("pthread_creates failed\n");
       exit(2);
     } else {
+      // store corresponding row number and boolean
+      check_compare[i] = true;
       addNode(list, threads[i]);
     }
   }
+
+
   
   for(int i = 0; i < ROW_NUM; i++) {
     if(pthread_join(threads[i], NULL)) {
@@ -602,23 +622,27 @@ int main(void) {
       exit(2);
     }
   }
-
+  
   if(pthread_join(check, NULL)) {
       perror("pthread_join main failed\n");
       exit(2);
    }
+  
+
+  
+  
 
 
   // Display the end of game message and wait for user input
-  // end_game();
+  end_game();
   
   // Clean up window
-  // delwin(mainwin);
-  //endwin();
+  delwin(mainwin);
+  endwin();
 
-  //destroyList(list);
+  destroyList(list);
 
-  //fclose(stream);
+  fclose(stream);
   return 0;
 } // main
 
