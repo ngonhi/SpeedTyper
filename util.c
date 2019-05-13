@@ -41,12 +41,14 @@ size_t time_ms() {
 
 // Check if row is empty (no word)
 bool is_empty(int row) {
+  pthread_mutex_lock(&m);
   for (int col = 0; col < BOARD_WIDTH; col++) {
     if (board[row][col] != ' ') {
+      pthread_mutex_unlock(&m);
       return false;
     }
   }
-
+  pthread_mutex_unlock(&m);
   return true;
 }
 
@@ -69,8 +71,8 @@ void* generate_word(void* p) {
   int row = args->row;
 
   while(check_running()) {
-    pthread_mutex_lock(&m);
     if(is_empty(row)) {
+      pthread_mutex_lock(&m);
       // Seek to the end of the file so we can get its size
       if(fseek(stream, 0, SEEK_END) != 0) {
         perror("Unable to seek to end of file");
@@ -130,16 +132,19 @@ void* generate_word(void* p) {
         perror("cannot getline");
         exit(2);
       } else {
+        //pthread_mutex_lock(&m);
         for (int i = 0; i < nread-1; i++) {
           on_screen[row][i] = *(string+i);
           board[row][i] = *(string+i);
         }
+        //pthread_mutex_unlock(&m);
       }
-
+      //pthread_mutex_lock(&m);
       on_screen[row][nread-1] = '\0';
+      pthread_mutex_unlock(&m);
       free(string);
     }
-    pthread_mutex_unlock(&m);
+    
   } // while running
   return NULL;
 }
@@ -167,7 +172,61 @@ void read_input() {
   input[i] = '\0';
 }
 
-// Add a null terminator
+void* compare_word() {
+  while (check_running()) {
+    pthread_mutex_lock(&m_input);
+    bool check = true;
+    int row;
+    if (input[0] == ' ') {
+      read_input();
+    }
+
+    // Compare with all on screen
+    pthread_mutex_lock(&m);
+    for(int i=0; i<ROW_NUM; i++) {
+      if(strcmp(input, on_screen[i]) != 0) {
+        check = false;
+      } else if (strcmp(input, on_screen[i]) == 0) {
+        row = i;
+        check = true;
+        break;
+      }
+    }
+    pthread_mutex_unlock(&m);
+
+    if (check) {
+      pthread_mutex_lock(&m_score);
+      score++;
+      pthread_mutex_unlock(&m_score);
+
+      // Clear input
+      for(int i=0; i<WORD_LEN; i++) {
+        input[i] = ' ';
+        mvaddch(screen_row(BOARD_HEIGHT/2), screen_col(BOARD_WIDTH + 3 + i), ' ');
+      }
+
+      // Clear on_screen and board
+      pthread_mutex_lock(&m);
+      for(int i = 0; i < WORD_LEN; i++) { 
+        on_screen[row][i] = ' ';
+      }
+      // delete word on screen and on board
+      for(int i = 0; i < BOARD_WIDTH; i++) {
+        board[row][i] = ' ';
+      }
+      pthread_mutex_unlock(&m);
+    } else {
+      for(int i = 0; i < WORD_LEN; i++) {
+        input[i] = ' ';
+        mvaddch(screen_row(BOARD_HEIGHT/2), screen_col(BOARD_WIDTH + 3 + i), ' ');
+      }
+    }
+    refresh();
+    pthread_mutex_unlock(&m_input);
+  } // while running
+  return NULL;
+}
+/* Add a null terminator
 // put input word as a global
 void* compare_word(void* p) {
   args_thread_t* arg = p;
@@ -250,7 +309,7 @@ void* compare_word(void* p) {
   } // while running
 
   return NULL;
-}
+} */
 
 // change draw_board into a thread function. we will call this in the main.
 // 1. draw a random word from the library
@@ -272,6 +331,7 @@ void* draw_board(void* p) {
       mvaddch(screen_row(r), screen_col(c), board[r][c]);
     }
     //}
+    
   
     // Draw the score
     pthread_mutex_lock(&m_score);
@@ -338,10 +398,10 @@ void* run_game(void* p) {
   //generate_word(stream, row);
   //pthread_mutex_unlock(&m);
 
-  pthread_t threads[4];
-  args_thread_t args[4];
+  pthread_t threads[3];
+  args_thread_t args[3];
 
-  for(int i = 0; i < 4; i++) {
+  for(int i = 0; i < 3; i++) {
     args[i].row = row;
     //printf("%d ",args[i].row);
   }
@@ -349,32 +409,33 @@ void* run_game(void* p) {
   if(pthread_create(&threads[0], NULL, generate_word, &args[0])) {
     perror("pthread_creates failed\n");
     exit(2);
-  } else {
+  } /*else {
     addNode(list, threads[0]);
-  }
+  }*/
   
   if(pthread_create(&threads[1], NULL, draw_board, &args[1])) {
     perror("pthread_creates failed\n");
     exit(2);
-  } else {
+  } /*else {
     addNode(list, threads[1]);
-  }
+  }*/
   
+  /*
   if(pthread_create(&threads[2], NULL, compare_word, &args[2])) {
     perror("pthread_creates failed\n");
     exit(2);
   } else {
     addNode(list, threads[2]);
-  }
+  } */
 
-  if(pthread_create(&threads[3], NULL, move_word, &args[3])) {
+  if(pthread_create(&threads[2], NULL, move_word, &args[2])) {
     perror("pthread_creates failed\n");
     exit(2);
-  } else {
-    addNode(list, threads[3]);
-  }
+  } /*else {
+    addNode(list, threads[2]);
+  }*/
 
-  for(int i = 0; i < 4; i++) {
+  for(int i = 0; i < 3; i++) {
     if(pthread_join(threads[i], NULL)) {
       perror("pthread_join main failed\n");
       exit(2);

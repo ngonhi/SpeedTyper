@@ -90,12 +90,18 @@ int main(void) {
     }
   }
   
+  /*
   pthread_t check;
   if(pthread_create(&check, NULL, check_thread, NULL)) {
     perror("pthread_creates failed\n");
     exit(2);
-  }
+  }*/
   
+  pthread_t compare;
+  if(pthread_create(&compare, NULL, compare_word, NULL)) {
+    perror("pthread_creates failed\n");
+    exit(2);
+  }
   
   pthread_t threads[ROW_NUM];
   args_thread_t args[ROW_NUM];
@@ -104,15 +110,19 @@ int main(void) {
     if(pthread_create(&threads[i], NULL, run_game, &args[i])) {
       perror("pthread_creates failed\n");
       exit(2);
-    } else {
+    } /*else {
       // store corresponding row number and boolean
       check_compare[i] = true;
       addNode(list, threads[i]);
-    }
+    }*/
   }
 
 
-  /*
+  if(pthread_join(compare, NULL)) {
+      perror("pthread_join main failed\n");
+      exit(2);
+   }
+  
   for(int i = 0; i < ROW_NUM; i++) {
     if(pthread_join(threads[i], NULL)) {
       perror("pthread_join main failed\n");
@@ -120,12 +130,9 @@ int main(void) {
     }
   }
   
-  if(pthread_join(check, NULL)) {
-      perror("pthread_join main failed\n");
-      exit(2);
-   }
-  */
 
+
+/*
   //use conditional variable
   pthread_mutex_lock(&lock_cv);
   while(kill_thread != 50) {
@@ -133,7 +140,7 @@ int main(void) {
   }
   pthread_mutex_unlock(&lock_cv);
 
-  
+ */ 
   
 
   
@@ -147,7 +154,7 @@ int main(void) {
   delwin(mainwin);
   endwin();
 
-  destroyList(list);
+  //destroyList(list);
 
   fclose(stream);
   return 0;

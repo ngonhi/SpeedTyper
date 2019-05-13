@@ -50,7 +50,7 @@ size_t time_ms();
 
 void* generate_word(void* p);
 
-void* compare_word(void* p);
+void* compare_word();
 
 void* draw_board(void* p);
 
@@ -58,6 +58,6 @@ void* move_word(void* p);
 
 void* run_game(void* p);
 
-void* check_thread(void* p);
+void* check_thread();
 
 #endif
