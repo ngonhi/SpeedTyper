@@ -1,6 +1,5 @@
 CC := clang
-CFLAGS := -g -Wall -Wno-deprecated-declarations -Werror -lpthread -fsanitize=address
-
+CFLAGS := -g -Wall -Wno-deprecated-declarations -Werror -lpthread
 all: worm
 
 clean:

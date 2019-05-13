@@ -49,6 +49,7 @@ pthread_mutex_t m3 = PTHREAD_MUTEX_INITIALIZER; // count_thread
 pthread_mutex_t m4 = PTHREAD_MUTEX_INITIALIZER; // counter
 pthread_mutex_t m5 = PTHREAD_MUTEX_INITIALIZER; // running
 
+int kill_thread = 0;
 pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t lock_cv = PTHREAD_MUTEX_INITIALIZER;
 
@@ -259,6 +260,19 @@ void read_input() {
   input[i] = '\0';
 }
 
+// Write a helper function check if running is true or false
+// lock check unlock return
+bool check_kill_thread(int num) {
+  pthread_mutex_lock(&list->lst_m);
+  if (num < list->length) {
+    pthread_mutex_unlock(&list->lst_m);
+    return true;
+  } else {
+    pthread_mutex_unlock(&list->lst_m);
+    return false;
+  }
+}
+
 void* check_thread() {
   while(check_running()) {
     // sleep_ms(100);
@@ -266,18 +280,36 @@ void* check_thread() {
   // terminate all other threads
   pthread_mutex_lock(&list->lst_m);
   node_t* cur = list->first;
-  int i = 0;
+  pthread_mutex_unlock(&list->lst_m);
+  //int i = 0;
+
+  pthread_mutex_lock(&lock_cv);
+  int temp = kill_thread;
+  pthread_mutex_unlock(&lock_cv);
+
+  end_game();
   
-  while(i < list->length) {
+  while(check_kill_thread(temp)) {
+    pthread_mutex_lock(&list->lst_m);
     pthread_t cur_thread = cur->thread;
     if(pthread_kill(cur_thread, SIGSTOP) != 0) {
       perror("cannot kill thread");
       exit(2);
     }
+    
     cur = cur->next;
-    i++;
+    pthread_mutex_unlock(&list->lst_m);
+
+    // cond variable piece
+    pthread_mutex_lock(&lock_cv);
+    kill_thread++;
+    mvaddch(screen_row(BOARD_HEIGHT), screen_col(10), kill_thread);
+    temp = kill_thread;
+    pthread_cond_signal(&cv);
+    pthread_mutex_unlock(&lock_cv);
+    
   }
-  pthread_mutex_lock(&list->lst_m);
+  //pthread_mutex_lock(&list->lst_m);
   
   return NULL;
 }
@@ -362,9 +394,6 @@ void* compare_word(void* p) {
           }
       
         }
-        //pthread_mutex_lock(&m3);
-        //count_thread++;
-        //pthread_mutex_unlock(&m3);
       }
   } // while running
 
@@ -400,9 +429,6 @@ void* draw_board(void* p) {
     mvprintw(screen_row(-2), screen_col(BOARD_WIDTH-9), "Score = %d", counter); // Get the count
     pthread_mutex_unlock(&m4);
 
-    pthread_mutex_lock(&list->lst_m);
-    mvprintw(screen_row(-2), screen_col(BOARD_WIDTH + 10), "l = %d", list->length);
-    pthread_mutex_unlock(&list->lst_m);
     // Refresh the display
     refresh();
 
@@ -442,6 +468,7 @@ void* move_word(void* p) {
     if(board[row][BOARD_WIDTH - 1] != ' ') {
       pthread_mutex_lock(&m5);
       running = false;
+      //end_game();
       pthread_mutex_unlock(&m5);
       //return NULL;
     }
@@ -527,7 +554,12 @@ void read_user_command(void) {
   }
   
   if(strcmp(command, "help") == 0) {
-    printf("\n\nSpeed Typer is a typing game aiming to provide users with interesting typing experience.\nThe user needs to type out the words appeared on the screenbefore they reached the border on the other side.\nHit enter after typing one word and if the word is correctly typed, the word will disappear from the screen and your score shown on the right hand corner will increment by 1.\nLet us get our fingering moving and enjoy the game!\n\n\n");
+    printf("\nSpeed Typer is a typing game aiming to provide users with interesting typing experience.\n");
+    printf("\t1. Hit enter after all the letters of one word is typed.\n");
+    printf("\t2. Hit enter when a typo happens to clear the input and retype.\n");
+    printf("\t3. This game does not support backspace =(\n");
+    printf("\t4. When a word reaches the edge of the other side, the game will end.\n");
+    printf("Let us get our fingers moving and enjoy the game!\n\n");
     
     user_menu();
     read_user_command();
@@ -535,9 +567,9 @@ void read_user_command(void) {
     //printf("Enter the number of rows you would like to challenge (1 - 20): ");
     //scanf("%d", &ROW_NUM);
     //printf("ROW_NUMBER = %d\n", ROW_NUM);
-    printf("Enter the speed level you would like to challenge (300 - 1000): ");
+    printf("Enter the speed level you would like to challenge (300 - 1000 decreasing speed): ");
     scanf("%d", &WORM_HORIZONTAL_INTERVAL);
-    printf("SPEED = %d\n", WORM_HORIZONTAL_INTERVAL);
+    //printf("SPEED = %d\n", WORM_HORIZONTAL_INTERVAL);
   } else if(strcmp(command, "quit") == 0) {
     exit(0);
   } else {
@@ -615,7 +647,7 @@ int main(void) {
   }
 
 
-  
+  /*
   for(int i = 0; i < ROW_NUM; i++) {
     if(pthread_join(threads[i], NULL)) {
       perror("pthread_join main failed\n");
@@ -627,6 +659,16 @@ int main(void) {
       perror("pthread_join main failed\n");
       exit(2);
    }
+  */
+
+  //use conditional variable
+  pthread_mutex_lock(&lock_cv);
+  while(kill_thread != 50) {
+    pthread_cond_wait(&cv, &lock_cv);
+  }
+  pthread_mutex_unlock(&lock_cv);
+
+  
   
 
   
