@@ -1,5 +1,5 @@
 CC := clang
-CFLAGS := -g -Wall -Wno-deprecated-declarations -Werror -lpthread -fsanitize=thread
+CFLAGS := -g -Wall -Wno-deprecated-declarations -Werror -lpthread
 
 all: speed-typer
 

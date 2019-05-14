@@ -261,131 +261,117 @@ void* compare_word() {
 }
 
 
-// change draw_board into a thread function. we will call this in the main.
-// 1. draw a random word from the library
-// 2. store the word in a buffer
-// 3. replace draw worm line of code with sending out the word
-
 /**
- * Run in a thread to draw the current state of the game board.
+ * Thread function that prints out one row of the board on the screen.
  */
-void* draw_board(void* p) {
+void* draw_row(void* p) {
+  // Unpack
   args_thread_t* arg = p;
   int r = arg->row;
-  // Need row, need word
+  
+  // Run this function while the game is running
   while(check_running()) {
     pthread_mutex_lock(&m);
-    // Loop over cells of the game board
-    //for (int r=0; r<BOARD_HEIGHT; r++) {
+    // Print out each char in the row on the screen.
     for(int c=0; c<BOARD_WIDTH; c++) {
       mvaddch(screen_row(r), screen_col(c), board[r][c]);
     }
-    //}
-    
-  
-    // Draw the score
+    // Update the score continuously
     pthread_mutex_lock(&m_score);
     mvprintw(screen_row(-2), screen_col(BOARD_WIDTH-9), "Score = %d", score); // Get the count
     pthread_mutex_unlock(&m_score);
 
     // Refresh the display
     refresh();
-
     pthread_mutex_unlock(&m);
-    // Sleep for a while before drawing the board again
+    // Sleep for a while before drawing the row again
     sleep_ms(DRAW_BOARD_INTERVAL);
   }
-  
   return NULL;
 }
 
 /**
- * Run in a thread to move the worm around on the board
+ * Thread function that moves one row to the right
  */
-// NEED TO UPDATE SPEED
-void* move_word(void* p) {
+void* move_row(void* p) {
+  // Unpack
   args_thread_t* arg = p;
   int row = arg->row;
+  // Buffer to store the current row of the board
   char temp[BOARD_WIDTH];
-
-  
+  // Run this function while the game is running
   while(check_running()) {
     pthread_mutex_lock(&m);
-
+    // Update the buffer to the current row of the board
     for (int i=0; i < BOARD_WIDTH; i++) {
       temp[i] = board[row][i];
     }
-    
-    // Update one thread i.e. one row
+    // Update the row of the board (move everything to right)
     board[row][0] = ' ';
+    // Update the buffer
     for (int col=1; col < BOARD_WIDTH; col++) {
       board[row][col] = temp[col - 1];
-    } // for col
-
+    }
     // Check for edge collisions
     if(board[row][BOARD_WIDTH - 1] != ' ') {
       pthread_mutex_lock(&m_running);
+      // Change the running boolean
       running = false;
-      
+      // Close the file
       if(fclose(stream)) {
         perror("Error closing file!");
         exit(2);
       }
-
       
       end_game();
-
-      // Clean up window
-      //delwin(mainwin);
-      //endwin();
-  
       pthread_mutex_unlock(&m_running);
-      //return NULL;
     }
-
     pthread_mutex_unlock(&m);
-    
-    sleep_ms(WORM_HORIZONTAL_INTERVAL);   
+    // Sleep for a while before moving the row again
+    sleep_ms(WORM_HORIZONTAL_INTERVAL); 
   } // while
-
   return NULL;
 }
 
+/**
+ * Thread function that updates everything for one row
+ */
 void* run_game(void* p) {
+  // Unpack
   args_thread_t* arg = p;
   int row = arg->row;
+  // Start to print out word at a different time
   sleep_ms(interval[row]);
 
+  // Declare sub-threads and thread arguments
   pthread_t threads[3];
   args_thread_t args[3];
 
   for(int i = 0; i < 3; i++) {
     args[i].row = row;
   }
-
+  // Call generate thread function
   if(pthread_create(&threads[0], NULL, generate_word, &args[0])) {
     perror("pthread_creates failed\n");
     exit(2);
   }
-  
-  if(pthread_create(&threads[1], NULL, draw_board, &args[1])) {
+  // Call draw_row thread function
+  if(pthread_create(&threads[1], NULL, draw_row, &args[1])) {
     perror("pthread_creates failed\n");
     exit(2);
   }
- 
-
-  if(pthread_create(&threads[2], NULL, move_word, &args[2])) {
+  // Call move_row thread function
+  if(pthread_create(&threads[2], NULL, move_row, &args[2])) {
     perror("pthread_creates failed\n");
     exit(2);
   }
-  
+  // Join all threads created
   for(int i = 0; i < 3; i++) {
     if(pthread_join(threads[i], NULL)) {
       perror("pthread_join main failed\n");
       exit(2);
     }
   }
-
   return NULL;
 }
 
