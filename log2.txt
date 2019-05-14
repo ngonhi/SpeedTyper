@@ -1,0 +1,70 @@
+==================
+WARNING: ThreadSanitizer: data race (pid=7981)
+  Write of size 8 at 0x7d640001bd00 by thread T1 (mutexes: write M6):
+    #0 memset <null> (speed-typer+0x000000424c50)
+    #1 getenv <null> (libncurses.so.5+0x000000007112)
+    #2 compare_word /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:212:7 (speed-typer+0x0000004a5840)
+
+  Previous write of size 8 at 0x7d640001bd00 by thread T6 (mutexes: write M7):
+    #0 memset <null> (speed-typer+0x000000424c50)
+    #1 getenv <null> (libncurses.so.5+0x000000007112)
+
+  Location is heap block of size 1200 at 0x7d640001bd00 allocated by thread T6:
+    #0 malloc <null> (speed-typer+0x00000042ce48)
+    #1 getenv <null> (libncurses.so.5+0x000000007047)
+
+  Mutex M6 (0x0000014b23a0) created at:
+    #0 pthread_mutex_lock <null> (speed-typer+0x00000043a0c0)
+    #1 compare_word /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:207:5 (speed-typer+0x0000004a5814)
+
+  Mutex M7 (0x0000014b2378) created at:
+    #0 pthread_mutex_lock <null> (speed-typer+0x00000043a0c0)
+    #1 is_empty /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:49:3 (speed-typer+0x0000004a4f6b)
+    #2 generate_word /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:92:8 (speed-typer+0x0000004a5120)
+
+  Thread T1 (tid=7983, running) created by main thread at:
+    #0 pthread_create <null> (speed-typer+0x000000425336)
+    #1 main /home/ngonhi/csc213/CSC213-SpeedTyper/speed-typer.c:89:6 (speed-typer+0x0000004a4c70)
+
+  Thread T6 (tid=7988, running) created by thread T2 at:
+    #0 pthread_create <null> (speed-typer+0x000000425336)
+    #1 run_game /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:371:6 (speed-typer+0x0000004a61c2)
+
+SUMMARY: ThreadSanitizer: data race (/home/ngonhi/csc213/CSC213-SpeedTyper/speed-typer+0x424c50) in __interceptor_memset
+==================
+==================
+WARNING: ThreadSanitizer: data race (pid=7981)
+  Write of size 8 at 0x7d540000ae38 by thread T25 (mutexes: write M7):
+    #0 memcpy <null> (speed-typer+0x000000424d40)
+    #1 <null> <null> (libncurses.so.5+0x0000000196d4)
+
+  Previous write of size 8 at 0x7d540000ae38 by thread T1 (mutexes: write M6):
+    #0 memcpy <null> (speed-typer+0x000000424d40)
+    #1 <null> <null> (libncurses.so.5+0x0000000196d4)
+    #2 compare_word /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:212:7 (speed-typer+0x0000004a5840)
+
+  Location is heap block of size 640 at 0x7d540000ac80 allocated by main thread:
+    #0 calloc <null> (speed-typer+0x00000042d834)
+    #1 newwin <null> (libncurses.so.5+0x0000000112dc)
+    #2 __libc_start_main <null> (libc.so.6+0x0000000202e0)
+
+  Mutex M7 (0x0000014b2378) created at:
+    #0 pthread_mutex_lock <null> (speed-typer+0x00000043a0c0)
+    #1 is_empty /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:49:3 (speed-typer+0x0000004a4f6b)
+    #2 generate_word /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:92:8 (speed-typer+0x0000004a5120)
+
+  Mutex M6 (0x0000014b23a0) created at:
+    #0 pthread_mutex_lock <null> (speed-typer+0x00000043a0c0)
+    #1 compare_word /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:207:5 (speed-typer+0x0000004a5814)
+
+  Thread T25 (tid=8008, running) created by thread T10 at:
+    #0 pthread_create <null> (speed-typer+0x000000425336)
+    #1 run_game /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:371:6 (speed-typer+0x0000004a61c2)
+
+  Thread T1 (tid=7983, running) created by main thread at:
+    #0 pthread_create <null> (speed-typer+0x000000425336)
+    #1 main /home/ngonhi/csc213/CSC213-SpeedTyper/speed-typer.c:89:6 (speed-typer+0x0000004a4c70)
+
+SUMMARY: ThreadSanitizer: data race (/home/ngonhi/csc213/CSC213-SpeedTyper/speed-typer+0x424d40) in memcpy
+==================
+ThreadSanitizer: reported 2 warnings

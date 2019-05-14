@@ -5,15 +5,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <signal.h>
 #include <time.h>
 
 #include "util.h"
 #include "interface.h"
-#include "list.h"
 
 /**
  * Sleep for a given number of milliseconds
  * \param   ms  The number of milliseconds to sleep for
+ * Taken from Charlie Curtsinger's worm lab
  */
 void sleep_ms(size_t ms) {
   struct timespec ts;
@@ -27,6 +28,7 @@ void sleep_ms(size_t ms) {
 
 /**
  * Get the time in milliseconds since UNIX epoch
+ * Taken from Charlie Curtsinger's worm lab
  */
 size_t time_ms() {
   struct timeval tv;
@@ -39,38 +41,54 @@ size_t time_ms() {
   return tv.tv_sec*1000 + tv.tv_usec/1000;
 }
 
-// Check if row is empty (no word)
+/**
+ * Check if the row is empty (no word) and return a boolean
+ */
 bool is_empty(int row) {
+  // Lock board's lock before checking
   pthread_mutex_lock(&m);
   for (int col = 0; col < BOARD_WIDTH; col++) {
     if (board[row][col] != ' ') {
+      // Release board's lock before returning
       pthread_mutex_unlock(&m);
       return false;
     }
   }
+  // Release board's lock before returning
   pthread_mutex_unlock(&m);
   return true;
 }
 
-
-// Write a helper function check if running is true or false
-// lock check unlock return
+/**
+ * Check if running (the global boolean) is true or false
+ */
 bool check_running() {
+  // Lock running's lock before checking
   pthread_mutex_lock(&m_running);
   if (running) {
+    // Release running's lock before returning
     pthread_mutex_unlock(&m_running);
     return true;
   } else {
+    // Release running's lock before returning
     pthread_mutex_unlock(&m_running);
     return false;
   }
 }
 
+/**
+ * Thread function that keeps checking if the global string (input) is empty
+ *   Empty: randomly seek a position in the library file and update board and on_screen
+ *   Not empty: waiting until the current row is empty
+ */
 void* generate_word(void* p) {
+  // Unpack thread argument
   args_thread_t*args = p;
   int row = args->row;
 
+  // Check if the game is still running
   while(check_running()) {
+    // Check if there is no word stored in the current row
     if(is_empty(row)) {
       pthread_mutex_lock(&m);
       // Seek to the end of the file so we can get its size
@@ -87,19 +105,20 @@ void* generate_word(void* p) {
         perror("Unable to seek to beginning of file");
         exit(2);
       }
-  
-      int offset = rand() % size; //check rand
-      while(offset > size-8) {
+
+      // Generate a random offset
+      int offset = rand() % size;
+      while(offset > size-8) { // (last word in input.txt is poison)
         offset = rand() % size;
-        printf("offset = %d\n", offset);
       }
 
-      
+      // Seek to the position of the random offset in stream
       if(fseek(stream, offset, SEEK_SET) != 0) {
         perror("Unable to seek to offset");
         exit(2);
       }
-      
+
+      // Move the offset to the last char of the current line
       char c;
       if((c = fgetc(stream)) == EOF) {
         if (ferror(stream) == 0) {
@@ -116,32 +135,35 @@ void* generate_word(void* p) {
           }
         }
       }
+      
+      // Move the offset to the first char of the word in next line
+      offset += 1;
 
-      offset += 1; // Move to new word
-
-      // reach the point to start reading
+      // Seek to the position of updated offset
       if(fseek(stream, offset, SEEK_SET) != 0) {
         perror("Unable to seek to offset");
         exit(2);
       }
 
+      // Read the line and store the word in both board and on_screen
       char* string = NULL;
       size_t len = 0;
       ssize_t nread = getline(&string, &len, stream);
+      // Error handling for getline
       if(nread == -1) {
         perror("cannot getline");
         exit(2);
       } else {
-        //pthread_mutex_lock(&m);
         for (int i = 0; i < nread-1; i++) {
           on_screen[row][i] = *(string+i);
           board[row][i] = *(string+i);
         }
-        //pthread_mutex_unlock(&m);
       }
-      //pthread_mutex_lock(&m);
+      // Add a null terminator in the end of the word for on_screen for later comparison using strcmp
       on_screen[row][nread-1] = '\0';
+      // Release the lock for board and on_screen
       pthread_mutex_unlock(&m);
+      // Free for calling getline
       free(string);
     }
     
@@ -149,44 +171,53 @@ void* generate_word(void* p) {
   return NULL;
 }
 
-// helper to read user input
+/**
+ * Read user input into input (global char array).
+ */
 void read_input() {
   char ch;
   if((ch = getch()) == ERR) {
-    fprintf(stderr, "getch fails\n");
+    perror("getch failed.");
     exit(2);
   } 
   int i = 0;
+  
+  // Stop reading when the user hit enter
   while(ch != '\n') {
-    
     input[i] = ch;
-    //pthread_mutex_lock(&m);
+    // Print the typing by the side of the game window
     mvaddch(screen_row(BOARD_HEIGHT/2), screen_col(BOARD_WIDTH + 3 + i), ch);
-    // pthread_mutex_unlock(&m);
     i++;
     if((ch = getch()) == ERR) {
-      fprintf(stderr, "getch fails\n");
+      perror("getch failed\n");
       exit(2);
     } 
   }
+  // Add a null terminator in the end for strcmp in compare_word().
   input[i] = '\0';
 }
 
+/**
+ * Thread function to compare input (global char array) with all words on the screen.
+ */
 void* compare_word() {
+  // Check if the game is still running
   while (check_running()) {
+    // Lock for input
     pthread_mutex_lock(&m_input);
     bool check = true;
     int row;
+    // Decide whether to read user input
     if (input[0] == ' ') {
       read_input();
     }
 
-    // Compare with all on screen
+    // Compare input with all the words stored in on_screen
     pthread_mutex_lock(&m);
     for(int i=0; i<ROW_NUM; i++) {
-      if(strcmp(input, on_screen[i]) != 0) {
+      if(strcmp(input, on_screen[i]) != 0) { // mismatch case
         check = false;
-      } else if (strcmp(input, on_screen[i]) == 0) {
+      } else if (strcmp(input, on_screen[i]) == 0) { // match case
         row = i;
         check = true;
         break;
@@ -194,9 +225,10 @@ void* compare_word() {
     }
     pthread_mutex_unlock(&m);
 
-    if (check) {
+    // Check if there is a match being found
+    if (check) { // match found
       pthread_mutex_lock(&m_score);
-      score++;
+      score++; // increment score
       pthread_mutex_unlock(&m_score);
 
       // Clear input
@@ -210,106 +242,24 @@ void* compare_word() {
       for(int i = 0; i < WORD_LEN; i++) { 
         on_screen[row][i] = ' ';
       }
-      // delete word on screen and on board
+      // Replace word on screen and on board with spaces
       for(int i = 0; i < BOARD_WIDTH; i++) {
         board[row][i] = ' ';
       }
       pthread_mutex_unlock(&m);
-    } else {
+    } else { // mismatch case
       for(int i = 0; i < WORD_LEN; i++) {
         input[i] = ' ';
         mvaddch(screen_row(BOARD_HEIGHT/2), screen_col(BOARD_WIDTH + 3 + i), ' ');
       }
     }
+    // Update
     refresh();
     pthread_mutex_unlock(&m_input);
   } // while running
   return NULL;
 }
-/* Add a null terminator
-// put input word as a global
-void* compare_word(void* p) {
-  args_thread_t* arg = p;
-  int row = arg->row;
-  
-  while(check_running()) {
-    //bool check = true; // might be a prob
-   
-    pthread_mutex_lock(&m_input);
-    if(input[0] == ' ') {
-      read_input();
-      pthread_mutex_unlock(&m_input);
-      pthread_mutex_lock(&m_compare);
-      for (int i = 0; i<ROW_NUM; i++) {
-        check_compare[i] = true;
-      }
-      pthread_mutex_unlock(&m_compare);
-    } else{
-      pthread_mutex_unlock(&m_input);
-    }
-    
-    // Ori check
-    
-    // Input can be read by multiple threads
-    pthread_mutex_lock(&m);
-      char* temp = on_screen[row];
-      pthread_mutex_unlock(&m);
-      pthread_mutex_lock(&m_input);
-      if(strcmp(input, temp) != 0) {
-        //check = false;
-        pthread_mutex_lock(&m_compare); // m_compare
-       //is currently for check_compare
-        check_compare[row] = false;
-        pthread_mutex_unlock(&m_compare);
-      }
-      pthread_mutex_unlock(&m_input);
 
-      pthread_mutex_lock(&m_compare);
-      if(check_compare[row]) {
-        pthread_mutex_unlock(&m_compare);
-        pthread_mutex_lock(&m_score);
-        score++;
-        pthread_mutex_unlock(&m_score);
-        // clear
-        pthread_mutex_lock(&m_input);
-        for(int i = 0; i < WORD_LEN; i++) {
-        
-          input[i] = ' ';
-          mvaddch(screen_row(BOARD_HEIGHT/2), screen_col(BOARD_WIDTH + 3 + i), ' ');
-        }
-        pthread_mutex_unlock(&m_input);
-        pthread_mutex_lock(&m);
-        for(int i = 0; i < WORD_LEN; i++) { 
-          on_screen[row][i] = ' ';
-        }
-        // delete word on screen and on board
-        for(int i = 0; i < BOARD_WIDTH; i++) {
-          board[row][i] = ' ';
-        }
-        pthread_mutex_unlock(&m);
-      } else {
-        bool check = false;
-        for (int i = 0; i<ROW_NUM; i++) {
-          if (check_compare[i]) {
-            check = true;
-          }
-        }
-        pthread_mutex_unlock(&m_compare);
-
-        if(!check) {
-          for(int i = 0; i < WORD_LEN; i++) {
-            pthread_mutex_lock(&m_input);
-            input[i] = ' ';
-            mvaddch(screen_row(BOARD_HEIGHT/2), screen_col(BOARD_WIDTH + 3 + i), ' ');
-            pthread_mutex_unlock(&m_input);
-          }
-      
-        }
-      }
-  } // while running
-
-  return NULL;
-} */
 
 // change draw_board into a thread function. we will call this in the main.
 // 1. draw a random word from the library
@@ -376,7 +326,19 @@ void* move_word(void* p) {
     if(board[row][BOARD_WIDTH - 1] != ' ') {
       pthread_mutex_lock(&m_running);
       running = false;
-      //end_game();
+      
+      if(fclose(stream)) {
+        perror("Error closing file!");
+        exit(2);
+      }
+
+      
+      end_game();
+
+      // Clean up window
+      //delwin(mainwin);
+      //endwin();
+  
       pthread_mutex_unlock(&m_running);
       //return NULL;
     }
@@ -394,47 +356,29 @@ void* run_game(void* p) {
   int row = arg->row;
   sleep_ms(interval[row]);
 
-  //pthread_mutex_lock(&m);
-  //generate_word(stream, row);
-  //pthread_mutex_unlock(&m);
-
   pthread_t threads[3];
   args_thread_t args[3];
 
   for(int i = 0; i < 3; i++) {
     args[i].row = row;
-    //printf("%d ",args[i].row);
   }
 
   if(pthread_create(&threads[0], NULL, generate_word, &args[0])) {
     perror("pthread_creates failed\n");
     exit(2);
-  } /*else {
-    addNode(list, threads[0]);
-  }*/
+  }
   
   if(pthread_create(&threads[1], NULL, draw_board, &args[1])) {
     perror("pthread_creates failed\n");
     exit(2);
-  } /*else {
-    addNode(list, threads[1]);
-  }*/
-  
-  /*
-  if(pthread_create(&threads[2], NULL, compare_word, &args[2])) {
-    perror("pthread_creates failed\n");
-    exit(2);
-  } else {
-    addNode(list, threads[2]);
-  } */
+  }
+ 
 
   if(pthread_create(&threads[2], NULL, move_word, &args[2])) {
     perror("pthread_creates failed\n");
     exit(2);
-  } /*else {
-    addNode(list, threads[2]);
-  }*/
-
+  }
+  
   for(int i = 0; i < 3; i++) {
     if(pthread_join(threads[i], NULL)) {
       perror("pthread_join main failed\n");
@@ -446,56 +390,3 @@ void* run_game(void* p) {
 }
 
 
-// Write a helper function check if running is true or false
-// lock check unlock return
-bool check_kill_thread(int num) {
-  pthread_mutex_lock(&list->lst_m);
-  if (num < list->length) {
-    pthread_mutex_unlock(&list->lst_m);
-    return true;
-  } else {
-    pthread_mutex_unlock(&list->lst_m);
-    return false;
-  }
-}
-
-void* check_thread() {
-  while(check_running()) {
-    // sleep_ms(100);
-  }
-  // terminate all other threads
-  pthread_mutex_lock(&list->lst_m);
-  node_t* cur = list->first;
-  pthread_mutex_unlock(&list->lst_m);
-  //int i = 0;
-
-  pthread_mutex_lock(&lock_cv);
-  int temp = kill_thread;
-  pthread_mutex_unlock(&lock_cv);
-
-  end_game();
-  
-  while(check_kill_thread(temp)) {
-    pthread_mutex_lock(&list->lst_m);
-    pthread_t cur_thread = cur->thread;
-    if(pthread_kill(cur_thread, SIGSTOP) != 0) {
-      perror("cannot kill thread");
-      exit(2);
-    }
-    
-    cur = cur->next;
-    pthread_mutex_unlock(&list->lst_m);
-
-    // cond variable piece
-    pthread_mutex_lock(&lock_cv);
-    kill_thread++;
-    mvaddch(screen_row(BOARD_HEIGHT), screen_col(10), kill_thread);
-    temp = kill_thread;
-    pthread_cond_signal(&cv);
-    pthread_mutex_unlock(&lock_cv);
-    
-  }
-  //pthread_mutex_lock(&list->lst_m);
-  
-  return NULL;
-}

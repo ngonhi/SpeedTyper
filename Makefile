@@ -1,9 +1,10 @@
 CC := clang
 CFLAGS := -g -Wall -Wno-deprecated-declarations -Werror -lpthread -fsanitize=thread
-all: worm
+
+all: speed-typer
 
 clean:
-	rm -rf worm worm.dSYM
+	rm -rf speed-typer  speed-typer.dSYM
 
-worm: worm.c util.c util.h list.c list.h interface.c interface.h
-	$(CC) $(CFLAGS) -o worm worm.c util.c list.c interface.c -lncurses
+speed-typer: speed-typer.c util.c util.h interface.c interface.h
+	$(CC) $(CFLAGS) -o speed-typer speed-typer.c util.c interface.c -lncurses

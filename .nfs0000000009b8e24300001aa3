@@ -1,0 +1,91 @@
+==================
+WARNING: ThreadSanitizer: data race (pid=16395)
+  Write of size 8 at 0x7d740001ea00 by thread T7 (mutexes: write M9):
+    #0 memset <null> (worm+0x000000424c50)
+    #1 getenv <null> (libncurses.so.5+0x000000007112)
+    #2 compare_word /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:182:7 (worm+0x0000004a58cf)
+
+  Previous write of size 8 at 0x7d740001ea00 by thread T17 (mutexes: write M7):
+    #0 memset <null> (worm+0x000000424c50)
+    #1 getenv <null> (libncurses.so.5+0x000000007112)
+
+  Location is heap block of size 2352 at 0x7d740001ea00 allocated by thread T5:
+    #0 malloc <null> (worm+0x00000042ce48)
+    #1 getenv <null> (libncurses.so.5+0x000000007047)
+
+  Mutex M9 (0x0000014b33a0) created at:
+    #0 pthread_mutex_lock <null> (worm+0x00000043a0c0)
+    #1 compare_word /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:180:5 (worm+0x0000004a58a7)
+
+  Mutex M7 (0x0000014b3378) created at:
+    #0 pthread_mutex_lock <null> (worm+0x00000043a0c0)
+    #1 generate_word /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:73:5 (worm+0x0000004a5127)
+
+  Thread T7 (tid=16403, running) created by thread T2 at:
+    #0 pthread_create <null> (worm+0x000000425336)
+    #1 run_game /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:364:6 (worm+0x0000004a646d)
+
+  Thread T17 (tid=16413, running) created by thread T4 at:
+    #0 pthread_create <null> (worm+0x000000425336)
+    #1 run_game /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:357:6 (worm+0x0000004a6405)
+
+  Thread T5 (tid=16401, running) created by thread T2 at:
+    #0 pthread_create <null> (worm+0x000000425336)
+    #1 run_game /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:357:6 (worm+0x0000004a6405)
+
+SUMMARY: ThreadSanitizer: data race (/home/ngonhi/csc213/CSC213-SpeedTyper/worm+0x424c50) in __interceptor_memset
+==================
+==================
+WARNING: ThreadSanitizer: data race (pid=16395)
+  Write of size 8 at 0x7d680000a3c0 by thread T7 (mutexes: write M9):
+    #0 memcpy <null> (worm+0x000000424d40)
+    #1 <null> <null> (libncurses.so.5+0x0000000196d4)
+    #2 compare_word /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:182:7 (worm+0x0000004a58cf)
+
+  Previous write of size 8 at 0x7d680000a3c0 by thread T5 (mutexes: write M7):
+    #0 memcpy <null> (worm+0x000000424d40)
+    #1 <null> <null> (libncurses.so.5+0x0000000196d4)
+
+  Location is heap block of size 1424 at 0x7d680000a200 allocated by main thread:
+    #0 calloc <null> (worm+0x00000042d834)
+    #1 newwin <null> (libncurses.so.5+0x0000000112dc)
+    #2 __libc_start_main <null> (libc.so.6+0x0000000202e0)
+
+  Mutex M9 (0x0000014b33a0) created at:
+    #0 pthread_mutex_lock <null> (worm+0x00000043a0c0)
+    #1 compare_word /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:180:5 (worm+0x0000004a58a7)
+
+  Mutex M7 (0x0000014b3378) created at:
+    #0 pthread_mutex_lock <null> (worm+0x00000043a0c0)
+    #1 generate_word /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:73:5 (worm+0x0000004a5127)
+
+  Thread T7 (tid=16403, running) created by thread T2 at:
+    #0 pthread_create <null> (worm+0x000000425336)
+    #1 run_game /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:364:6 (worm+0x0000004a646d)
+
+  Thread T5 (tid=16401, running) created by thread T2 at:
+    #0 pthread_create <null> (worm+0x000000425336)
+    #1 run_game /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:357:6 (worm+0x0000004a6405)
+
+SUMMARY: ThreadSanitizer: data race (/home/ngonhi/csc213/CSC213-SpeedTyper/worm+0x424d40) in memcpy
+==================
+==================
+WARNING: ThreadSanitizer: data race (pid=16395)
+  Write of size 1 at 0x0000014b36b6 by thread T7 (mutexes: write M11):
+    #0 compare_word /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:186:26 (worm+0x0000004a5921)
+
+  Previous write of size 1 at 0x0000014b36b6 by main thread:
+    #0 main /home/ngonhi/csc213/CSC213-SpeedTyper/worm.c:109:24 (worm+0x0000004a4d2f)
+
+  Location is global 'check_compare' of size 10 at 0x0000014b36b4 (worm+0x0000014b36b6)
+
+  Mutex M11 (0x0000014b33c8) created at:
+    #0 pthread_mutex_lock <null> (worm+0x00000043a0c0)
+    #1 compare_word /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:184:7 (worm+0x0000004a58f0)
+
+  Thread T7 (tid=16403, running) created by thread T2 at:
+    #0 pthread_create <null> (worm+0x000000425336)
+    #1 run_game /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:364:6 (worm+0x0000004a646d)
+
+SUMMARY: ThreadSanitizer: data race /home/ngonhi/csc213/CSC213-SpeedTyper/util.c:186:26 in compare_word
+==================

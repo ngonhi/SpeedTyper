@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "list.h"
 #include "interface.h"
 
 
@@ -16,12 +15,10 @@ extern char on_screen[ROW_NUM][WORD_LEN];
 extern pthread_mutex_t m;// board, on_screen
 
 extern FILE* stream;
+extern WINDOW* mainwin;
 
 extern char input[WORD_LEN];
 extern pthread_mutex_t m_input; // input
-
-extern bool check_compare[ROW_NUM];
-extern pthread_mutex_t m_compare; // check_compare
 
 extern int score;
 extern pthread_mutex_t m_score; // score
@@ -29,13 +26,8 @@ extern pthread_mutex_t m_score; // score
 extern bool running;
 extern pthread_mutex_t m_running; // running
 
-extern int kill_thread;
-extern pthread_cond_t cv; 
-extern pthread_mutex_t lock_cv;
 
 extern size_t interval[ROW_NUM];
-
-extern linkedlist_t* list;
 
 typedef struct args_thread{
   int row;
@@ -58,6 +50,5 @@ void* move_word(void* p);
 
 void* run_game(void* p);
 
-void* check_thread();
 
 #endif
